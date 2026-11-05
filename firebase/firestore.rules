@@ -1,0 +1,77 @@
+rules_version = '2';
+// 聲音秘書：會員資料權限規則（由伺服器強制執行，會員無法繞過）
+// 擁有者 Email 寫在下面 isOwner() 裡（setup 腳本會自動填好）
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner() {
+      return signedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in ['OWNER_EMAIL@example.com'];
+    }
+    function isAdmin() {
+      return isOwner() || (signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    // 功能開放設定：大家都能讀，管理員才能改
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 會員等級：本人可以讀；管理員可以改別人的，只有擁有者能改自己的
+    match /tiers/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isOwner() || (isAdmin() && request.auth.uid != uid);
+    }
+
+    // 管理員名單：只有擁有者能指定
+    match /admins/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isOwner();
+    }
+
+    // 會員資料與使用紀錄：本人寫自己的，管理員可以看全部
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['joinedAt','lastSeen','visits','usage','name','email'])
+        && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.get('email', ''))
+        && (!('visits' in request.resource.data) || request.resource.data.visits is int)
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 60));
+      allow delete: if isOwner() || (signedIn() && request.auth.uid == uid);
+    }
+
+    // ===== 三個 Android App：資料按 App 分開（apps/secretary、apps/stories、apps/audiobook）=====
+    match /apps/{app} {
+      function appAdmin() {
+        return isOwner() || (signedIn() && exists(/databases/$(database)/documents/apps/$(app)/admins/$(request.auth.uid)));
+      }
+      match /config/{doc} {
+        allow read: if true;
+        allow write: if appAdmin();
+      }
+      match /tiers/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || appAdmin());
+        allow write: if isOwner() || (appAdmin() && request.auth.uid != uid);
+      }
+      match /admins/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || appAdmin());
+        allow write: if isOwner();
+      }
+      match /users/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || appAdmin());
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['joinedAt','lastSeen','visits','usage','name','email'])
+        && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.get('email', ''))
+        && (!('visits' in request.resource.data) || request.resource.data.visits is int)
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 60));
+        allow delete: if isOwner() || (signedIn() && request.auth.uid == uid);
+      }
+    }
+
+    // AI 每日次數：只有伺服器能讀寫
+    match /quota/{uid} {
+      allow read, write: if false;
+    }
+  }
+}

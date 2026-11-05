@@ -1,0 +1,8 @@
+{
+  "appId": "com.example.bedtimestories",
+  "appName": "睡前故事屋",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}

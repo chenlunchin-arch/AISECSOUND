@@ -1,0 +1,20 @@
+{
+  "name": "voice-secretary-audiobook",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "assets": "capacitor-assets generate --android",
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "@capacitor-community/text-to-speech": "8.0.2",
+    "@capacitor-community/keep-awake": "8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2",
+    "@capacitor/assets": "3.0.5"
+  }
+}

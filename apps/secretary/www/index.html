@@ -1,0 +1,2294 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1F5F52">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<script src="native-shim.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<title>聲音秘書</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;900&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a secretary's desk — inbox slip on top, the spoken briefing below; three voices, three colored stripes */
+:root{
+  --bg:#EEF1F0; --paper:#FBFCFB; --ink:#18221F; --muted:#5B6A65; --line:#D3DBD8;
+  --accent:#1F5F52; --accent-ink:#FFFFFF;
+  --urgent:#B3261E; --urgent-bg:#FBEAE8;
+  --key:#A86200; --key-bg:#FCF1DF;
+  --info:#3E6A8A; --info-bg:#E6EEF4;
+  --v1:#C2477A; --v2:#6B5A3E; --v3:#D9752B; --v4:#6F4FB8; --v5:#2F7A4A; --hl:#FFF0B8;
+  --v6:#3A6FA8; --v7:#8A5A44; --v8:#A87A1E; --v9:#B0479A; --v10:#2E6A78;
+  --f-display:"Noto Serif TC","Songti TC",serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111816; --paper:#18211F; --ink:#E6EEEB; --muted:#93A39E; --line:#2C3A36;
+  --accent:#5FBFA8; --accent-ink:#0B1513;
+  --urgent:#FF8A80; --urgent-bg:#3A1F1D; --key:#F2B45A; --key-bg:#382A14; --info:#8FB8D6; --info-bg:#1A2A36;
+  --v1:#F28DB5; --v2:#D2BC94; --v3:#F5A764; --v4:#B9A0F2; --v5:#7FD39E; --hl:#4A3F14;
+  --v6:#8DB8F0; --v7:#E0A68C; --v8:#F0C86A; --v9:#F0A0DE; --v10:#7FCAD8;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --paper:#18211F; --ink:#E6EEEB; --muted:#93A39E; --line:#2C3A36;
+  --accent:#5FBFA8; --accent-ink:#0B1513;
+  --urgent:#FF8A80; --urgent-bg:#3A1F1D; --key:#F2B45A; --key-bg:#382A14; --info:#8FB8D6; --info-bg:#1A2A36;
+  --v1:#F28DB5; --v2:#D2BC94; --v3:#F5A764; --v4:#B9A0F2; --v5:#7FD39E; --hl:#4A3F14;
+  --v6:#8DB8F0; --v7:#E0A68C; --v8:#F0C86A; --v9:#F0A0DE; --v10:#7FCAD8;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 14px;font-weight:700;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+/* story */
+.search{display:flex;gap:8px}
+.search input{flex:1;min-width:0;font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input[type="text"]:focus{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{min-height:32px;padding:4px 12px;font-size:13px;border-radius:999px}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.results{display:flex;flex-direction:column;gap:8px;max-height:520px;overflow:auto;padding-right:2px}
+.results>*{flex-shrink:0}
+.res{display:grid;gap:4px;text-align:left;justify-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);width:100%;min-height:0}
+.res:hover{border-color:var(--accent)}
+.res.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.res-top{display:flex;gap:8px;align-items:center;width:100%}
+.res-title{font-weight:700;flex:1;min-width:0}
+.res-snip{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.res .heard{color:var(--accent);font-weight:700;margin-right:4px}
+.more{justify-content:center;width:100%;color:var(--muted)}
+mark{background:var(--hl);color:var(--ink);border-radius:2px;padding:0 1px}
+.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.vcard{position:relative;display:grid;gap:2px;padding:10px 12px 10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer;text-align:left;justify-items:start;min-height:0}
+.vcard::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:4px;border-radius:0 3px 3px 0;background:var(--c)}
+.vcard[aria-checked="true"]{border-color:var(--c);box-shadow:0 0 0 1px var(--c) inset}
+.vname{font-weight:700;color:var(--c)}
+.vdesc{font-size:12px;color:var(--muted);line-height:1.4}
+.v1{--c:var(--v1)} .v2{--c:var(--v2)} .v3{--c:var(--v3)} .v4{--c:var(--v4)} .v5{--c:var(--v5)}
+.v6,.ya{--c:var(--v6)} .v7,.n1{--c:var(--v7)} .v8,.n2{--c:var(--v8)} .v9,.qing{--c:var(--v9)} .v10,.n3,.vivian{--c:var(--v10)}
+.vcard .lock,.pchip .lock{font-size:11px;color:var(--muted);font-weight:500}
+.vcard.locked{opacity:.55}
+.personas{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.reader{background:var(--bg);border-radius:10px;padding:18px 18px 22px;display:grid;gap:10px;min-width:0}
+.reader h3{font-family:var(--f-display);font-size:24px;margin:0;text-wrap:balance}
+.story{position:relative;font-family:var(--f-display);font-weight:600;font-size:19px;line-height:1.95;max-height:460px;overflow:auto;overflow-wrap:anywhere}
+.story p{margin:0 0 .7em}
+.sent{cursor:pointer;border-radius:3px;padding:1px 0}
+.sent:hover{text-decoration:underline dotted var(--muted)}
+.sent.now{background:var(--hl)}
+.toggle{display:flex;align-items:center;gap:8px;font-size:14px}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.toggle select{width:auto}
+.slider{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.slider input{width:120px;accent-color:var(--accent)}
+.newdoc{display:grid;gap:8px}
+.newdoc input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.newdoc textarea{min-height:120px}
+.tnum{font-variant-numeric:tabular-nums}
+.shelf{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.shelf li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.shelf li.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.shelf .bt{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;background:none;border:0;padding:0;min-height:0;text-align:left;display:block;width:100%}
+.shelf .bm{grid-column:1;font-size:12px;color:var(--muted)}
+.shelf .bx{grid-row:1/span 2;grid-column:2;display:flex;gap:6px}
+.shelf .bx button{min-height:30px;padding:2px 10px;font-size:13px}
+.progress{height:6px;border-radius:3px;background:var(--bg);overflow:hidden}
+.progress span{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.setgrid label{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.timer{font-family:var(--f-mono);font-size:14px;padding:6px 10px;border-radius:8px;background:var(--key-bg);color:var(--key)}
+.story.book{font-size:18px;font-weight:600;max-height:380px}
+.segs{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:4px;max-height:340px;overflow:auto}
+.segs button{width:100%;justify-content:space-between;min-height:36px;padding:6px 10px;font-size:14px;text-align:left;background:var(--bg)}
+.segs button .sn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.segs button .sd{font-size:12px;color:var(--muted)}
+.segs button.done .sn{color:var(--muted)}
+.segs button.cur{border-color:var(--accent);font-weight:700}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 20px}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(28px,6vw,40px);line-height:1.1;margin:0;letter-spacing:.02em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:46ch}
+.clock{font-family:var(--f-mono);color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.grid{display:grid;gap:20px;grid-template-columns:1fr}
+@media(min-width:880px){.grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:start}}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:14px;min-width:0}
+.label{font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:0}
+h2{font-family:var(--f-display);font-size:20px;margin:0}
+textarea{width:100%;min-height:220px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--bg);color:var(--ink);font:inherit;line-height:1.6}
+textarea:focus,select:focus,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.filebtn{font:inherit;font-weight:500;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:40px}
+button:hover,.filebtn:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+button:disabled{opacity:.5;cursor:not-allowed}
+.drop{position:relative;display:grid;gap:2px;justify-items:center;text-align:center;padding:18px 12px;border:1.5px dashed var(--line);border-radius:10px;background:var(--bg);cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--paper)}
+.drop:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0;z-index:1}
+.drop-main{font-weight:700;color:var(--accent)}
+.drop-sub{font-size:13px;color:var(--muted)}
+.files{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.files:empty{display:none}
+.files li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+.ftype{font-family:var(--f-mono);font-size:11px;padding:2px 6px;border-radius:4px;background:var(--bg);color:var(--muted)}
+.fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fmeta{display:block;font-size:12px;color:var(--muted)}
+.fmeta.err{color:var(--urgent)}
+.files button{min-height:30px;padding:2px 10px;font-size:13px}
+.status{font-size:13px;color:var(--muted);min-height:1.4em}
+.summary{font-family:var(--f-display);font-size:18px;line-height:1.6;margin:0}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.items{display:grid;gap:10px}
+.item{display:grid;grid-template-columns:5px 1fr;border-radius:8px;overflow:hidden;background:var(--bg)}
+.item .stripe{background:var(--c)}
+.item .body{padding:12px 14px;display:grid;gap:6px;min-width:0}
+.item.urgent{--c:var(--urgent);--cb:var(--urgent-bg)} .item.important{--c:var(--key);--cb:var(--key-bg)} .item.info{--c:var(--info);--cb:var(--info-bg)}
+.item.speaking{background:var(--cb)}
+.item.read{opacity:.6}
+.ihead{display:flex;gap:8px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.lvl{font-size:12px;font-weight:700;color:var(--c);letter-spacing:.06em}
+.ititle{font-weight:700;margin:0;font-size:16px}
+.itext{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.act{margin:0;font-size:13px;color:var(--muted)}
+.act b{color:var(--ink);font-weight:500}
+.play{min-height:32px;padding:4px 10px;font-size:13px}
+.del{color:var(--muted)} .del:hover{color:var(--urgent);border-color:var(--urgent)}
+.voices{display:grid;gap:10px}
+.vrow{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;align-items:center}
+.vrow .lvl{display:flex;align-items:center;gap:6px}
+.vrow .lvl::before{content:"";width:10px;height:10px;border-radius:2px;background:var(--c)}
+.vrow.urgent{--c:var(--urgent)} .vrow.important{--c:var(--key)} .vrow.info{--c:var(--info)}
+select{width:100%;min-width:0;font:inherit;font-size:14px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.knobs{display:flex;gap:12px;grid-column:2;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.knobs label{display:flex;align-items:center;gap:6px}
+.knobs input{width:90px;accent-color:var(--c)}
+details summary{cursor:pointer;font-weight:500}
+.empty{color:var(--muted);text-align:center;padding:24px 8px}
+.counts{display:flex;gap:6px;flex-wrap:wrap}
+.counts span{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--cb);color:var(--c);font-weight:700}
+.counts .urgent{--c:var(--urgent);--cb:var(--urgent-bg)} .counts .important{--c:var(--key);--cb:var(--key-bg)} .counts .info{--c:var(--info);--cb:var(--info-bg)}
+/* 會員 */
+.hright{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.memchip{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 4px;border:1px solid var(--line);border-radius:999px;background:var(--paper)}
+.memchip img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:var(--bg)}
+.memtext{display:flex;flex-direction:column;line-height:1.2;font-size:13px;min-width:0}
+.memtext #memName{font-weight:700;max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memchip button{min-height:30px;padding:2px 10px;font-size:13px;border-radius:999px}
+.tierbadge{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.04em}
+.tierbadge.vip{color:var(--key)} .tierbadge.admin{color:var(--urgent)}
+.lockbar{margin:0;padding:10px 12px;border-radius:8px;background:var(--key-bg);color:var(--ink);font-size:14px}
+.admin{display:grid;gap:20px}
+.twocol{display:grid;gap:20px;grid-template-columns:1fr}
+@media(min-width:880px){.twocol{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{padding:12px 14px;border-radius:8px;background:var(--bg)}
+.kpi b{display:block;font-family:var(--f-display);font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--muted)}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:7.5em minmax(0,1fr) 3.5em;gap:8px;align-items:center;font-size:13px}
+.bar i{display:block;height:10px;border-radius:5px;background:var(--accent);min-width:2px}
+.bar .track{background:var(--bg);border-radius:5px}
+.bar em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+.mtable,.matrix{width:100%;border-collapse:collapse;font-size:14px}
+.mtable th,.mtable td,.matrix th,.matrix td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.mtable th,.matrix th{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.mtable .who{display:flex;align-items:center;gap:8px;min-width:150px}
+.mtable .who img{width:26px;height:26px;border-radius:50%}
+.mtable select{width:auto;min-width:7em}
+.mtable .use{font-size:12px;color:var(--muted);min-width:180px}
+.matrix td{text-align:center} .matrix td:first-child,.matrix th:first-child{text-align:left}
+.matrix input{width:18px;height:18px;accent-color:var(--accent)}
+.matrix small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.hits{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.hits li{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}
+.hits img{width:24px;height:24px;border-radius:50%}
+.hits button{margin-left:auto;min-height:30px;padding:2px 10px;font-size:13px}
+.deploy{font-size:14px;display:grid;gap:10px}
+.deploy p{margin:0}
+.deploy table{border-collapse:collapse;width:100%;font-size:13px}
+.deploy td,.deploy th{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left;vertical-align:top}
+.deploy code{font-family:var(--f-mono);font-size:12px;background:var(--bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+#adFilter,#adSearch,.fld input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.modal{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 45%,transparent);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));z-index:10}
+.loginbox{width:min(420px,100%)}
+.fld{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.item{transition:background .25s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>聲音秘書</h1>
+      <p class="sub" id="sub">貼上信件、訊息或會議紀錄。秘書會挑出緊急與重要的事，用三種不同聲音唸給你聽。</p>
+    </div>
+    <div class="hright">
+      <div class="clock" id="clock"></div>
+      <div class="memchip" id="memchip" hidden>
+        <img id="memAvatar" alt="" width="28" height="28">
+        <span class="memtext"><span id="memName"></span><span class="tierbadge" id="memTier"></span></span>
+        <button type="button" id="memLogin" hidden>登入</button>
+        <button type="button" id="memLogout" hidden>登出</button>
+        <button type="button" id="memDelete" hidden>刪除帳號</button>
+      </div>
+    </div>
+  </header>
+  <p class="lockbar" id="memNotice" hidden></p>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tabBtn-sec" aria-controls="tab-sec" aria-selected="true">秘書簡報</button>
+    <button role="tab" id="tabBtn-story" aria-controls="tab-story" aria-selected="false">故事時間</button>
+    <button role="tab" id="tabBtn-book" aria-controls="tab-book" aria-selected="false">有聲書</button>
+    <button role="tab" id="tabBtn-admin" aria-controls="tab-admin" aria-selected="false" hidden>後台管理</button>
+  </nav>
+
+  <div class="grid" id="tab-story" role="tabpanel" hidden>
+    <section class="panel" aria-labelledby="findTitle">
+      <p class="label">找故事與文件</p>
+      <h2 id="findTitle">想聽什麼？</h2>
+      <form class="search" id="searchForm">
+        <input type="text" id="q" placeholder="例如：兔子、勇敢、分享、合約…" aria-label="搜尋故事或文件" autocomplete="off">
+        <button class="primary" type="submit">搜尋</button>
+      </form>
+      <div class="row">
+        <select id="cat" aria-label="故事分類" style="flex:1;width:auto;min-width:0"></select>
+        <button type="button" id="randomBtn">隨機挑一篇</button>
+      </div>
+      <p class="status" id="libCount" style="margin:-4px 0 0">正在載入故事庫…</p>
+      <div class="results" id="results"></div>
+      <div class="row" id="aiRow">
+        <button id="aiStory" type="button">請 AI 講一個故事</button>
+        <select id="age" aria-label="聽故事的年齡" style="width:auto">
+          <option value="3-5 歲">3–5 歲</option>
+          <option value="6-8 歲" selected>6–8 歲</option>
+          <option value="9-12 歲">9–12 歲</option>
+        </select>
+      </div>
+      <p class="status" id="storyStatus" role="status"></p>
+      <details>
+        <summary>新增文件到書櫃</summary>
+        <div class="newdoc" style="margin-top:10px">
+          <input type="text" id="ndTitle" placeholder="標題" aria-label="文件標題">
+          <textarea id="ndText" placeholder="貼上故事或文件內容…" aria-label="文件內容"></textarea>
+          <div class="row"><button class="primary" id="ndSave" type="button">存到書櫃</button></div>
+        </div>
+        <p class="status">在「秘書簡報」匯入的檔案也會自動放進書櫃，之後可以在這裡搜尋。</p>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="readTitle">
+      <p class="label">說故事的人</p>
+      <div class="vcards" id="vcards" role="radiogroup" aria-label="選擇說故事的聲音"></div>
+      <div class="row" style="justify-content:space-between">
+        <label class="toggle"><input type="checkbox" id="dialog" checked>角色對話換成
+          <select id="dialogVoice" aria-label="角色對話的聲音"></select></label>
+        <label class="slider">速度<input type="range" id="speed" min="0.6" max="1.3" step="0.05" value="1"></label>
+      </div>
+      <div class="reader">
+        <h3 id="readTitle">選一個故事</h3>
+        <p class="status" id="readSrc" style="margin:-6px 0 0"></p>
+        <div class="story" id="story"></div>
+      </div>
+      <div class="row">
+        <button class="primary" id="sPlay" type="button">▶ 開始講</button>
+        <button id="sPause" type="button">⏸ 暫停</button>
+        <button id="sStop" type="button">■ 從頭</button>
+        <button id="sDel" type="button" class="del" hidden>從書櫃刪除</button>
+      </div>
+      <p class="status">點故事裡任何一句，就從那一句開始講。</p>
+      <details>
+        <summary>調整講故事與說書人的聲音</summary>
+        <div class="voices" id="kidVoices" style="margin-top:12px"></div>
+      </details>
+    </section>
+  </div>
+
+  <div class="admin" id="tab-admin" role="tabpanel" hidden>
+    <section class="panel" aria-labelledby="adOverview">
+      <div class="row" style="justify-content:space-between">
+        <div><p class="label">後台管理</p><h2 id="adOverview">會員總覽</h2></div>
+        <span class="status" id="adSync"></span>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="twocol">
+        <div><p class="label" style="margin-bottom:8px">各等級人數</p><div class="bars" id="tierBars"></div></div>
+        <div><p class="label" style="margin-bottom:8px">功能使用次數（全部會員累計）</p><div class="bars" id="useBars"></div></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="adMembers">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <div><p class="label">權限賜予</p><h2 id="adMembers">會員管理</h2></div>
+        <div class="row">
+          <input type="text" id="adFilter" placeholder="篩選名字" aria-label="篩選會員" autocomplete="off">
+          <select id="adTierFilter" aria-label="篩選等級" style="width:auto"></select>
+        </div>
+      </div>
+      <div class="tablewrap"><table class="mtable" id="memTable"></table></div>
+      <p class="status" id="adStatus" role="status"></p>
+      <details>
+        <summary>新增會員</summary>
+        <div class="row" style="margin-top:10px">
+          <input type="text" id="adSearch" placeholder="輸入名字或 Email 搜尋" aria-label="搜尋要加入的人" autocomplete="off" style="flex:1;min-width:0">
+          <select id="adNewTier" aria-label="新會員的等級" style="width:auto"></select>
+        </div>
+        <ul class="hits" id="adHits"></ul>
+        <p class="status" id="adSearchNote"></p>
+      </details>
+    </section>
+
+    <div class="twocol">
+      <section class="panel" aria-labelledby="adMatrix">
+        <div><p class="label">功能開放</p><h2 id="adMatrix">各等級能用的功能</h2></div>
+        <div class="tablewrap"><table class="matrix" id="matrix"></table></div>
+        <div class="row">
+          <button class="primary" type="button" id="mxSave">儲存設定</button>
+          <button type="button" id="mxReset">恢復預設</button>
+        </div>
+        <p class="status" id="mxStatus" role="status"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="adDeploy">
+        <div><p class="label">平台權限與部署</p><h2 id="adDeploy">網址與權限對照</h2></div>
+        <div class="deploy" id="deployInfo"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="modal" id="loginModal" hidden role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <form class="panel loginbox" id="loginForm">
+      <h2 id="loginTitle">登入聲音秘書</h2>
+      <label class="fld">Email<input type="email" id="lgEmail" autocomplete="email" required></label>
+      <label class="fld">密碼<input type="password" id="lgPw" autocomplete="current-password" minlength="6" required></label>
+      <label class="fld" id="lgNameWrap" hidden>暱稱<input type="text" id="lgName" autocomplete="nickname"></label>
+      <div class="row">
+        <button class="primary" type="submit" id="lgSubmit">登入</button>
+        <button type="button" id="lgSwitch">還沒有帳號？註冊</button>
+      </div>
+      <div class="row">
+        <button type="button" id="lgGoogle">用 Google 帳號登入</button>
+        <button type="button" id="lgForgot">忘記密碼</button>
+        <button type="button" id="lgClose">先不要</button>
+      </div>
+      <p class="status" id="lgStatus" role="status"></p>
+    </form>
+  </div>
+
+  <div class="grid" id="tab-book" role="tabpanel" hidden>
+    <section class="panel" aria-labelledby="shelfTitle">
+      <p class="label">書架</p>
+      <h2 id="shelfTitle">匯入整本書</h2>
+      <p class="lockbar" id="bookLock" hidden></p>
+      <label class="drop" id="bookDrop">
+        <input type="file" id="bookFile">
+        <span class="drop-main">選擇一本書</span>
+        <span class="drop-sub">TXT、EPUB、PDF、Word · 會自動找出章節</span>
+      </label>
+      <details>
+        <summary>或貼上整本書的文字</summary>
+        <div class="newdoc" style="margin-top:10px">
+          <input type="text" id="pbTitle" placeholder="書名" aria-label="書名">
+          <textarea id="pbText" placeholder="貼上全文，章節標題（例如「第一章」「Chapter 1」）單獨一行就能自動分章…" aria-label="書的全文"></textarea>
+          <div class="row"><button class="primary" id="pbSave" type="button">加入書架</button></div>
+        </div>
+      </details>
+      <p class="status" id="bookStatus" role="status"></p>
+      <ul class="shelf" id="shelf"></ul>
+    </section>
+
+    <section class="panel" aria-labelledby="bkTitle">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div style="min-width:0">
+          <p class="label">正在聽</p>
+          <h2 id="bkTitle">還沒選書</h2>
+          <p class="status" id="bkMeta" style="margin:2px 0 0"></p>
+        </div>
+      </div>
+      <div class="progress" aria-hidden="true"><span id="bkBar"></span></div>
+
+      <div class="setgrid">
+        <label>分段方式
+          <select id="bkMode">
+            <option value="chapter">依章節</option>
+            <option value="min">依時間長度</option>
+          </select></label>
+        <label id="bkMinWrap">每段約
+          <select id="bkMin">
+            <option value="5">5 分鐘</option><option value="10" selected>10 分鐘</option><option value="15">15 分鐘</option>
+            <option value="20">20 分鐘</option><option value="30">30 分鐘</option><option value="45">45 分鐘</option></select></label>
+        <label>聲音
+          <select id="bkVoice"></select></label>
+        <label>定時停止
+          <select id="bkTimer">
+            <option value="0">不設定</option><option value="seg">讀完這段</option><option value="chap">讀完這章</option>
+            <option value="10">10 分鐘後</option><option value="15">15 分鐘後</option><option value="20">20 分鐘後</option>
+            <option value="30">30 分鐘後</option><option value="45">45 分鐘後</option><option value="60">60 分鐘後</option><option value="90">90 分鐘後</option></select></label>
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <label class="toggle"><input type="checkbox" id="bkAuto" checked>自動接著念下一段</label>
+        <label class="slider">速度<input type="range" id="bkSpeed" min="0.6" max="1.8" step="0.05" value="1"><span id="bkSpeedVal" class="tnum">1.0×</span></label>
+      </div>
+
+      <div class="row">
+        <button id="bkPrev" type="button" aria-label="上一段">⏮ 上一段</button>
+        <button class="primary" id="bkPlay" type="button">▶ 播放</button>
+        <button id="bkNext" type="button" aria-label="下一段">下一段 ⏭</button>
+        <span class="timer tnum" id="bkTimerLeft" hidden></span>
+      </div>
+
+      <div class="reader">
+        <p class="label" id="bkSegLabel" style="margin:0"></p>
+        <div class="story book" id="bkText"></div>
+      </div>
+      <p class="status">點任何一句就從那裡開始念。進度會自動記住。念的時候請讓螢幕保持開啟，鎖定螢幕後大多數手機會停止朗讀。</p>
+
+      <details id="segDetails">
+        <summary id="segSummary">全部分段</summary>
+        <ol class="segs" id="segs"></ol>
+      </details>
+    </section>
+  </div>
+
+  <div class="grid" id="tab-sec" role="tabpanel">
+    <section class="panel" aria-labelledby="inTitle">
+      <p class="label">收件匣</p>
+      <h2 id="inTitle">要我看什麼？</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file" multiple>
+        <span class="drop-main">匯入檔案</span>
+        <span class="drop-sub">點這裡選擇，或把檔案拖進來 · PDF、Word、圖片、文字檔，可多選</span>
+      </label>
+      <ul class="files" id="files"></ul>
+      <textarea id="src" aria-label="要分析的內容" placeholder="或直接貼上文字…"></textarea>
+      <div class="row">
+        <button class="primary" id="analyze">判斷重點</button>
+        <button id="clear">全部清空</button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+
+      <div>
+        <p class="label" style="margin-bottom:6px">秘書的聲音</p>
+        <div class="personas" id="personas" role="radiogroup" aria-label="選擇秘書的聲音"></div>
+      </div>
+      <details>
+        <summary>聲音設定</summary>
+        <div class="voices" id="voices" style="margin-top:12px"></div>
+        <p class="status" id="voiceNote"></p>
+        <p class="label" style="margin:14px 0 6px">秘書人設細調</p>
+        <div class="voices" id="secPersonaSettings"></div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="outTitle">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <p class="label">簡報</p>
+          <h2 id="outTitle">今天要注意的事</h2>
+        </div>
+        <span class="tag" id="source"></span>
+      </div>
+      <p class="summary" id="summary"></p>
+      <div class="counts" id="counts"></div>
+      <div class="row">
+        <button class="primary" id="readKey">▶ 播報緊急＋重要</button>
+        <button id="readAll">播報全部</button>
+        <button id="stop">■ 停止</button>
+        <button id="clearRead" hidden>清除已讀</button>
+        <button id="clearBrief">清除全部</button>
+      </div>
+      <div class="row" id="confirmBox" hidden>
+        <span>確定要清除所有事項？</span>
+        <button id="confirmYes" class="primary">清除</button>
+        <button id="confirmNo">取消</button>
+      </div>
+      <div class="items" id="items"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+function showErr(msg){const s=document.getElementById("status");if(s)s.textContent="出錯了："+msg}
+window.addEventListener("error",e=>showErr(e.message||"未知錯誤"));
+window.addEventListener("unhandledrejection",e=>showErr(e.reason?.message||e.reason?.code||String(e.reason)));
+const LEVELS = {
+  urgent:   {name:"緊急", role:"警示聲", rate:1.08, pitch:0.8},
+  important:{name:"重要", role:"主播聲", rate:1.0,  pitch:1.0},
+  info:     {name:"參考", role:"輕鬆聲", rate:1.05, pitch:1.35}
+};
+const ORDER = ["urgent","important","info"];
+
+const SAMPLE_TEXT = `寄件人：王經理
+主旨：本週事項
+
+大家好，
+1. 客戶 A 的合約今天下午 5 點前一定要回簽，否則報價失效，請業務組立即處理。
+2. 週五上午 10 點在 3 樓會議室開季度檢討會，請各組準備 Q3 數據簡報。
+3. 伺服器昨晚出現兩次錯誤，IT 已在排查，若今天再發生請馬上通報。
+4. 下週一起停車場重新畫線，請改停 B2。
+5. 福委會這個月的下午茶是芋頭蛋糕。
+
+謝謝！`;
+
+const SAMPLE_RESULT = {
+  summary:"今天最要緊的是下午 5 點前回簽客戶 A 合約；另外週五要開季度檢討會，伺服器狀況也要留意。",
+  items:[
+    {level:"urgent",title:"客戶 A 合約今天 17:00 前回簽",text:"超過時間報價就失效，業務組要立即處理。",action:"確認合約內容並回簽"},
+    {level:"urgent",title:"伺服器若再出錯要馬上通報",text:"昨晚已出現兩次錯誤，IT 正在排查。",action:"有異常立刻通知 IT"},
+    {level:"important",title:"週五 10:00 季度檢討會",text:"地點 3 樓會議室，各組要帶 Q3 數據簡報。",action:"這兩天準備好簡報"},
+    {level:"info",title:"下週一起改停 B2",text:"停車場重新畫線。",action:""},
+    {level:"info",title:"本月下午茶是芋頭蛋糕",text:"福委會活動。",action:""}
+  ]
+};
+
+const $ = id => document.getElementById(id);
+
+/* =================== 會員：等級與功能開關（核心） =================== */
+const TIERS=[["guest","訪客"],["free","免費會員"],["standard","一般會員"],["vip","VIP 會員"]];
+const TIER_KEYS=TIERS.map(t=>t[0]);
+const tierName=k=>(TIERS.find(t=>t[0]===k)||[k,k])[1];
+const FEATURES=[
+  ["ai_analyze","AI 判斷重點","秘書用 AI 分析文字與圖片；沒開放時改用本機規則"],
+  ["file_import","匯入檔案","PDF、Word、圖片、文字檔"],
+  ["story_full","完整故事庫","沒開放時只能聽最溫馨的 100 篇"],
+  ["ai_story","請 AI 講故事","依關鍵字和年齡寫一篇新故事"],
+  ["audiobook","有聲書","匯入整本書、分段朗讀、定時停止"],
+  ["premium_voices","進階聲音","3 位美女秘書、3 位說書人、5 種新的講故事聲音"]
+];
+const featName=k=>(FEATURES.find(f=>f[0]===k)||[k,k])[1];
+const DEFAULT_MATRIX={
+  guest:{file_import:true},
+  free:{ai_analyze:true,file_import:true,story_full:true},
+  standard:{ai_analyze:true,file_import:true,story_full:true,ai_story:true,audiobook:true},
+  vip:{ai_analyze:true,file_import:true,story_full:true,ai_story:true,audiobook:true,premium_voices:true}
+};
+function mergeMatrix(m){
+  const out=JSON.parse(JSON.stringify(DEFAULT_MATRIX));
+  if(m&&typeof m==="object") TIER_KEYS.forEach(t=>FEATURES.forEach(([f])=>{if(m[t]&&f in m[t]) out[t][f]=!!m[t][f]}));
+  return out;
+}
+/* mode: "local" = 沒有會員後端（單人使用，全部開放）；"claude" = Claude 平台；"site" = 獨立網站 Firebase */
+const M={mode:"local",ready:false,me:null,isAdmin:false,isOwner:false,tier:"guest",matrix:mergeMatrix(null),canWrite:null,member:null,dirty:false,members:{},tiers:{},admins:{}};
+function canUse(f){ if(M.mode==="local"||M.isAdmin) return true; return !!(M.matrix[M.tier]||{})[f]; }
+function lockMsg(f){
+  const open=TIER_KEYS.filter(t=>M.matrix[t]?.[f]).map(tierName);
+  return `「${featName(f)}」${open.length?`開放給${open.join("、")}`:"目前沒有開放"}。你現在是${tierName(M.tier)}，請聯絡管理員升級。`;
+}
+function gate(f,el){ if(canUse(f)) return true; if(el) el.textContent=lockMsg(f); return false; }
+const saved = load("vs_result", null);
+const state = saved && Array.isArray(saved.result?.items)
+  ? {result:saved.result, source:saved.source||"", speaking:-1}
+  : {result:JSON.parse(JSON.stringify(SAMPLE_RESULT)), source:"範例", speaking:-1};
+function persist(){save("vs_result",{result:state.result,source:state.source})}
+const voiceCfg = {urgent:{}, important:{}, info:{}};
+let voices = [];
+
+/* ---------- clock ---------- */
+function tick(){
+  const d=new Date();
+  $("clock").textContent = d.toLocaleDateString("zh-TW",{month:"long",day:"numeric",weekday:"short"})+" · "+d.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",hour12:false});
+}
+tick(); setInterval(tick,30000);
+
+/* ---------- storage (per-viewer convenience) ---------- */
+function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+$("src").value = load("vs_draft", SAMPLE_TEXT);
+$("src").addEventListener("input",()=>save("vs_draft",$("src").value));
+Object.assign(voiceCfg, load("vs_voices", voiceCfg));
+
+/* ---------- render ---------- */
+function render(){
+  const r = state.result;
+  persist();
+  $("summary").textContent = r.items.length ? (r.summary || "") : "";
+  $("readKey").disabled = $("readAll").disabled = $("clearBrief").disabled = !r.items.length;
+  const readN = r.items.filter(i=>i.read).length;
+  $("clearRead").hidden = !readN; $("clearRead").textContent = `清除已讀（${readN}）`;
+  $("source").textContent = state.source; $("source").hidden = !state.source;
+  const counts = $("counts"); counts.innerHTML="";
+  ORDER.forEach(l=>{
+    const n = r.items.filter(i=>i.level===l).length;
+    if(n){const s=document.createElement("span");s.className=l;s.textContent=LEVELS[l].name+" "+n;counts.append(s)}
+  });
+  const box=$("items"); box.innerHTML="";
+  if(!r.items.length){box.innerHTML='<p class="empty">簡報是空的。匯入檔案或貼上文字，再按「判斷重點」。</p>';return}
+  r.items.forEach((it,i)=>{
+    const el=document.createElement("article");
+    el.className="item "+it.level+(state.speaking===i?" speaking":"");
+    el.innerHTML='<div class="stripe"></div><div class="body"><div class="ihead"><span class="lvl"></span><span class="row" style="gap:6px"><button class="play" type="button">▶ 唸這則</button><button class="play del" type="button" aria-label="刪除這則">✕ 刪除</button></span></div><p class="ititle"></p><p class="itext"></p></div>';
+    el.querySelector(".del").onclick=()=>{
+      if(hasTTS&&(state.speaking>=0||state.active)){speechSynthesis.cancel();state.active=false}
+      state.speaking=-1;
+      state.result.items.splice(i,1);
+      persist(); render();
+      $("status").textContent="已刪除一則。";
+    };
+    if(it.read && state.speaking!==i) el.classList.add("read");
+    el.querySelector(".lvl").textContent=LEVELS[it.level].name+" · "+LEVELS[it.level].role+(it.read?" · 已讀":"");
+    el.querySelector(".ititle").textContent=it.title;
+    el.querySelector(".itext").textContent=it.text||"";
+    if(it.action){const a=document.createElement("p");a.className="act";a.innerHTML="建議動作：<b></b>";a.querySelector("b").textContent=it.action;el.querySelector(".body").append(a)}
+    el.querySelector(".play").onclick=()=>speakQueue([i],false);
+    box.append(el);
+  });
+}
+
+/* ---------- voices ---------- */
+const hasTTS = "speechSynthesis" in window;
+function zhVoices(){
+  const all = hasTTS ? speechSynthesis.getVoices() : [];
+  const zh = all.filter(v=>/^zh|cmn|yue/i.test(v.lang));
+  return zh.length ? zh : all;
+}
+function buildVoiceUI(){
+  voices = zhVoices();
+  const wrap=$("voices"); wrap.innerHTML="";
+  if(!hasTTS){$("voiceNote").textContent="這個瀏覽器不支援語音朗讀。";return}
+  const zhCount = voices.filter(v=>/^zh|cmn|yue/i.test(v.lang)).length;
+  $("voiceNote").textContent = zhCount>1
+    ? `找到 ${zhCount} 個中文聲音，三種等級預設分配不同聲音。`
+    : "裝置只有一個中文聲音時，會用不同音調與語速區分三種等級。";
+  ORDER.forEach((l,idx)=>{
+    const cfg = voiceCfg[l];
+    if(!cfg.voice && voices.length) cfg.voice = voices[Math.min(idx, voices.length-1)].name;
+    if(cfg.rate==null) cfg.rate=LEVELS[l].rate;
+    if(cfg.pitch==null) cfg.pitch=LEVELS[l].pitch;
+    const row=document.createElement("div"); row.className="vrow "+l;
+    row.innerHTML=`<span class="lvl">${LEVELS[l].name}</span><select id="v_${l}" aria-label="${LEVELS[l].name}的聲音"></select>
+      <div class="knobs"><label>語速<input type="range" id="r_${l}" min="0.6" max="1.6" step="0.05"></label>
+      <label>音調<input type="range" id="p_${l}" min="0.5" max="1.8" step="0.05"></label>
+      <button class="play" type="button" id="t_${l}">試聽</button></div>`;
+    wrap.append(row);
+    const sel=row.querySelector("select");
+    voices.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=`${v.name} (${v.lang})`;sel.append(o)});
+    sel.value=cfg.voice||"";
+    const r=row.querySelector(`#r_${l}`), p=row.querySelector(`#p_${l}`);
+    r.value=cfg.rate; p.value=cfg.pitch;
+    const upd=()=>{cfg.voice=sel.value;cfg.rate=+r.value;cfg.pitch=+p.value;save("vs_voices",voiceCfg)};
+    sel.onchange=upd; r.oninput=upd; p.oninput=upd;
+    row.querySelector(`#t_${l}`).onclick=()=>{stopAllSpeech();speechSynthesis.speak(utter(`這是${LEVELS[l].name}事項的聲音。`,l))};
+  });
+}
+if(hasTTS){speechSynthesis.onvoiceschanged=buildVoiceUI}
+buildVoiceUI();
+
+let secPersona=load("vs_secpersona","levels");
+const LEVEL_SHIFT={urgent:{rate:1.07,pitch:-0.1},important:{rate:1,pitch:0},info:{rate:1.02,pitch:0.08}};
+function renderPersonas(){
+  const box=$("personas"); if(!box) return; box.innerHTML="";
+  const lock=!canUse("premium_voices");
+  if(lock&&secPersona!=="levels") secPersona="levels";
+  [{key:"levels",name:"三種聲音分級",desc:"緊急、重要、參考各用一種聲音"},...SEC_PERSONAS].forEach(k=>{
+    const b=document.createElement("button"); b.type="button"; b.className="vcard "+(k.key==="levels"?"v5":k.key); b.setAttribute("role","radio"); b.setAttribute("aria-checked",secPersona===k.key);
+    const locked=k.premium&&lock; if(locked) b.classList.add("locked");
+    b.innerHTML='<span class="vname"></span><span class="vdesc"></span>'+(locked?'<span class="lock">🔒 進階聲音</span>':'');
+    b.querySelector(".vname").textContent=k.name; b.querySelector(".vdesc").textContent=k.desc;
+    b.onclick=()=>{
+      if(locked){$("status").textContent=lockMsg("premium_voices");return}
+      secPersona=k.key; save("vs_secpersona",k.key); renderPersonas();
+      if(hasTTS){stopAllSpeech();speechSynthesis.speak(utter(k.key==="levels"?"我會用三種聲音，幫你區分緊急、重要和參考的事。":`您好，我是${k.name.split("・")[0]}，今天的重點由我來報告。`,"important"))}
+    };
+    box.append(b);
+  });
+}
+function utter(text,level){
+  if(secPersona!=="levels"&&presetOf(secPersona)){
+    const u=kidUtter(text,secPersona), k=presetOf(secPersona), c=kidCfg[k.key]||{}, sh=LEVEL_SHIFT[level]||LEVEL_SHIFT.important;
+    u.rate=Math.max(0.3,Math.min(2,(c.rate??k.rate)*sh.rate)); u.pitch=Math.max(0,Math.min(2,(c.pitch??k.pitch)+sh.pitch));
+    return u;
+  }
+  const u=new SpeechSynthesisUtterance(text);
+  const cfg=voiceCfg[level]||{};
+  const v=voices.find(x=>x.name===cfg.voice);
+  if(v){u.voice=v;u.lang=v.lang}else{u.lang="zh-TW"}
+  u.rate=cfg.rate??LEVELS[level].rate; u.pitch=cfg.pitch??LEVELS[level].pitch;
+  return u;
+}
+
+/* ---------- speaking ---------- */
+function speakQueue(indexes, withIntro){
+  if(!hasTTS){$("status").textContent="這個瀏覽器不支援語音朗讀。";return}
+  if(st.playing) stopStory(false);
+  if(typeof bk!=="undefined"&&bk.playing) stopBook();
+  speechSynthesis.cancel(); state.active=true;
+  const items=state.result.items;
+  const queue=[];
+  if(withIntro && state.result.summary) queue.push({text:"摘要。"+state.result.summary, level:"important", idx:-1});
+  indexes.forEach(i=>{
+    const it=items[i];
+    let t=`${LEVELS[it.level].name}。${it.title}。${it.text||""}`;
+    if(it.action) t+=`建議：${it.action}。`;
+    queue.push({text:t, level:it.level, idx:i});
+  });
+  queue.forEach((q,n)=>{
+    const u=utter(q.text,q.level);
+    u.onstart=()=>{state.speaking=q.idx;const it=state.result.items[q.idx];if(it)it.read=true;render()};
+    if(n===queue.length-1) u.onend=u.onerror=()=>{state.speaking=-1;state.active=false;render()};
+    speechSynthesis.speak(u);
+  });
+}
+$("readKey").onclick=()=>{
+  const idx=state.result.items.map((it,i)=>it.level!=="info"?i:-1).filter(i=>i>=0);
+  speakQueue(idx,true);
+};
+$("readAll").onclick=()=>speakQueue(state.result.items.map((_,i)=>i),true);
+$("clearRead").onclick=()=>{
+  if(hasTTS) speechSynthesis.cancel();
+  const before=state.result.items.length;
+  state.speaking=-1; state.result.items=state.result.items.filter(i=>!i.read); render();
+  $("status").textContent=`已刪除 ${before-state.result.items.length} 則已讀事項。`;
+};
+$("clearBrief").onclick=()=>{$("confirmBox").hidden=false};
+$("confirmNo").onclick=()=>{$("confirmBox").hidden=true};
+$("confirmYes").onclick=()=>{
+  if(hasTTS) speechSynthesis.cancel();
+  state.speaking=-1; state.result={summary:"",items:[]}; state.source="";
+  $("confirmBox").hidden=true; render();
+  $("status").textContent="簡報已清空。";
+};
+$("stop").onclick=()=>{if(hasTTS)speechSynthesis.cancel();state.speaking=-1;state.active=false;render()};
+/* 試聽或其他動作要發聲前，先讓所有正在播放的功能正確停下（避免狀態卡在「播放中」） */
+function stopAllSpeech(){
+  if(st.playing) stopStory(false);
+  if(typeof bk!=="undefined"&&bk.playing) stopBook();
+  if(hasTTS) speechSynthesis.cancel();
+  if(state.speaking>=0||state.active){state.speaking=-1;state.active=false;render()}
+}
+
+/* ---------- analysis ---------- */
+function sortItems(items){
+  return items.filter(i=>LEVELS[i.level]&&i.title).sort((a,b)=>ORDER.indexOf(a.level)-ORDER.indexOf(b.level));
+}
+function localAnalyze(text){
+  const urgentRe=/緊急|立即|馬上|立刻|今天|今日|今晚|截止|逾期|失效|一定要|務必|盡快|ASAP|urgent|錯誤|故障|當機|警告/i;
+  const keyRe=/會議|開會|明天|週[一二三四五六日]|星期|下週|準備|簡報|付款|繳|報告|確認|請.{0,6}(回覆|提供|完成)|\d{1,2}[:：點]\d{0,2}|\d+\s*月\s*\d+\s*日/;
+  const parts=text.split(/\n+|(?<=[。！？!?；;])/).map(s=>s.replace(/^\s*[\d一二三四五六七八九十]+[.、)）]\s*/,"").trim()).filter(s=>s.length>4);
+  const items=parts.filter(s=>!/^(寄件人|收件人|主旨|大家好|謝謝|您好|Hi|Dear)/i.test(s)).map(s=>{
+    const level=urgentRe.test(s)?"urgent":keyRe.test(s)?"important":"info";
+    const title=s.length>28?s.slice(0,26)+"…":s;
+    return {level,title,text:s.length>28?s:"",action:""};
+  });
+  const top=items.find(i=>i.level==="urgent")||items.find(i=>i.level==="important");
+  return {summary: top?`最需要先處理的是：${top.title.replace(/…$/,"")}`:"內容裡沒有明顯的緊急事項。", items:sortItems(items).slice(0,12)};
+}
+
+let sample=null;
+(async()=>{try{sample=await window.claude?.use("sample")}catch(e){sample=null}if(docs.length)renderFiles()})();
+
+const ERR={email_unverified:"請先到信箱點驗證連結，完成 Email 驗證後才能使用 AI，已先改用本機規則判斷。",not_granted:"你沒有允許這個頁面使用 Claude，已改用本機規則判斷。",sampling_disabled:"這個帳號無法使用 Claude，已改用本機規則判斷。",rate_limited:"Claude 使用次數暫時用完，已改用本機規則判斷，稍後可再試。",session_expired:"請重新登入 Claude，已暫時改用本機規則判斷。",refused:"Claude 無法處理這段內容，已改用本機規則判斷。",invalid_json:"Claude 回覆格式不完整，已改用本機規則判斷，可再按一次。"};
+
+$("analyze").onclick=async()=>{
+  if(docs.some(d=>d.status==="loading")){$("status").textContent="檔案還在讀取，請稍等一下。";return}
+  const text=gatherText();
+  let images=gatherImages();
+  if(!text&&!images.length){$("status").textContent="請先匯入檔案或貼上要分析的內容。";return}
+  const btn=$("analyze"); btn.disabled=true;
+  stopAllSpeech();
+  track("analyze");
+  if(!sample||!canUse("ai_analyze")){
+    const locked=sample&&!canUse("ai_analyze");
+    if(!text){$("status").textContent=locked?lockMsg("ai_analyze"):"圖片需要在 Claude 中開啟這個頁面，才能用 AI 辨識。";btn.disabled=false;return}
+    state.result=localAnalyze(text); state.source="本機規則"; render();
+    $("status").textContent=locked?lockMsg("ai_analyze")+" 已先用本機規則判斷。":"已用本機關鍵字規則判斷（在 Claude 中開啟可用 AI 判斷"+(images.length?"與辨識圖片":"")+"）。";
+    btn.disabled=false; return;
+  }
+  let imgNote="";
+  if(images.length){
+    const lim=await sample.limits().catch(()=>null);
+    if(!lim?.images){images=[];imgNote="這個畫面無法傳送圖片，只分析了文字。"}
+    else if(images.length>lim.images.maxCount){images=images.slice(0,lim.images.maxCount);imgNote=`一次最多分析 ${lim.images.maxCount} 張圖片，其餘已略過。`}
+  }
+  if(!text&&!images.length){$("status").textContent=imgNote;btn.disabled=false;return}
+  $("status").textContent="秘書正在閱讀並判斷…";
+  try{
+    const prompt=`你是一位細心的行政秘書。請閱讀下面的內容${images.length?`（以及附上的 ${images.length} 張圖片，可能是文件照片或螢幕截圖，請先辨識其中文字）`:""}，找出使用者需要知道的事項，並判斷每一項的等級：
+- "urgent"：有時限（今天、數小時內）、會造成損失、或需要立刻行動
+- "important"：需要行動或準備，但不是今天就要
+- "info"：知道就好的資訊
+規則：每項標題 25 字以內、說明 40 字以內、建議動作 15 字以內（沒有就給空字串）；保留具體時間、地點、人名、金額；依緊急→重要→參考排序；最多 12 項。summary 用 1～2 句、口語、適合朗讀。全部使用繁體中文。
+只回覆 JSON，格式：{"summary":"…","items":[{"level":"urgent","title":"…","text":"…","action":"…"}]}
+
+內容：
+"""
+${(text||"（沒有文字，請以圖片內容為準）").slice(0,60000)}
+"""`;
+    const data=await sample.json(prompt,images.length?{modelTier:"default",images,kind:"ai_analyze"}:{modelTier:"default",kind:"ai_analyze"});
+    if(!data||!Array.isArray(data.items)) throw {code:"invalid_json"};
+    state.result={summary:String(data.summary||""),items:sortItems(data.items.map(i=>({level:String(i.level),title:String(i.title||""),text:String(i.text||""),action:String(i.action||"")})))};
+    state.source="AI 判斷"; render();
+    $("status").textContent="判斷完成。按「播報」開始朗讀。"+(imgNote?" "+imgNote:"");
+  }catch(e){
+    const code=e&&e.code;
+    if(code==="cancelled"){$("status").textContent="";}
+    else if(!text){
+      $("status").textContent=(code==="image_rejected"?"圖片無法辨識（格式或大小不符），請換一張。":(ERR[code]||"連線出了問題，請再試一次。").replace("已改用本機規則判斷","沒有完成分析").replace("已暫時改用本機規則判斷","沒有完成分析"))+" 原本的簡報沒有變動。";
+    }
+    else{
+      state.result=localAnalyze(text); state.source="本機規則"; render();
+      $("status").textContent=ERR[code]||"連線出了問題，已改用本機規則判斷，可再按一次。";
+    }
+  }finally{btn.disabled=false}
+};
+
+/* ---------- file import ---------- */
+const docs=[]; // {id,name,kind,text,blob,status,error}
+let docSeq=0;
+const libs={};
+function loadScript(src){
+  return libs[src] ||= new Promise((ok,fail)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>{delete libs[src];fail(new Error("load"))};document.head.append(s)});
+}
+const PDFJS="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+let cmapsP=null;
+class CMapsJsonFactory{
+  constructor(){}
+  async fetch({name}){
+    const all=await (cmapsP ||= fetch(new URL("cmaps.json",location.href)).then(r=>{if(!r.ok)throw new Error("cmaps "+r.status);return r.json()}).catch(e=>{cmapsP=null;throw e}));
+    const b=all[name]; if(!b) throw new Error("缺少字碼對照表 "+name);
+    return {cMapData:Uint8Array.from(atob(b),c=>c.charCodeAt(0)),compressionType:1};
+  }
+}
+const PDFJS_WORKER="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const MAMMOTH="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js";
+
+function kindOf(f){
+  const n=f.name.toLowerCase();
+  if(f.type==="application/pdf"||n.endsWith(".pdf")) return "pdf";
+  if(n.endsWith(".docx")) return "docx";
+  if(f.type.startsWith("image/")) return "image";
+  if(n.endsWith(".doc")) return "doc";
+  return "text";
+}
+const KIND_LABEL={pdf:"PDF",docx:"WORD",image:"圖片",text:"文字",doc:"DOC"};
+
+/* 文字檔編碼：UTF-8 不會誤判，先試；Big5 與 GBK 的位元組常常互相「合法」，
+   所以兩種都解出來，看哪一個含有較多常用中文字（繁簡都算），選分數高的。 */
+const COMMON_CJK="的一是了不在人有我他這个這們们中來来上大為为和國国說说時时要就出會会可也你對对生能而子那得於于著着下自之年過过發发後后作裡里用道行所然家種种事成方多經经麼么去法學学如都同現现當当沒没動动面起看定天分還还進进好小部其些主樣样理心她本前開开但因只從从想實实日月水火山風风雨花草樹树狗貓猫書书媽妈爸今明晚再見见請请謝谢問问章節节第";
+function cjkScore(t){ let n=0,bad=0; for(const ch of t.slice(0,20000)){ if(COMMON_CJK.includes(ch)) n++; else if(ch==="\uFFFD") bad+=5; } return n-bad; }
+function decodeText(buf){
+  const u8=new Uint8Array(buf);
+  try{return new TextDecoder("utf-8",{fatal:true}).decode(u8).replace(/^\uFEFF/,"")}catch(e){}
+  let best=null,score=-Infinity;
+  for(const enc of ["big5","gb18030"]){
+    let t; try{t=new TextDecoder(enc).decode(u8)}catch(e){continue}
+    const sc=cjkScore(t); if(sc>score){score=sc;best=t}
+  }
+  return (best??new TextDecoder("utf-8").decode(u8)).replace(/^\uFEFF/,"");
+}
+async function extract(f,kind,opt={}){
+  if(kind==="text"){
+    let t=decodeText(await f.arrayBuffer());
+    if(/\.html?$/i.test(f.name)){const d=new DOMParser().parseFromString(t,"text/html");t=d.body?.innerText||d.body?.textContent||""}
+    return t;
+  }
+  if(kind==="docx"){
+    await loadScript(MAMMOTH);
+    const r=await window.mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});
+    return r.value;
+  }
+  if(kind==="pdf"){
+    await loadScript(PDFJS);
+    const lib=window.pdfjsLib; lib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;
+    // cMaps：使用標準中文字型（未內嵌）的 PDF 需要字碼對照表才能抽出文字；全部打包在 cmaps.json，隨頁面一起發布，用到時才下載
+    const pdf=await lib.getDocument({data:new Uint8Array(await f.arrayBuffer()),useWorkerFetch:false,cMapUrl:"cmaps/",cMapPacked:true,CMapReaderFactory:CMapsJsonFactory}).promise;
+    const out=[]; const max=Math.min(pdf.numPages,opt.maxPages||40);
+    for(let p=1;p<=max;p++){
+      const tc=await (await pdf.getPage(p)).getTextContent();
+      let line="",lastY=null;
+      tc.items.forEach(it=>{const y=it.transform[5];if(lastY!==null&&Math.abs(y-lastY)>3){out.push(line);line=""}line+=it.str;lastY=y});
+      out.push(line);
+      if(opt.onProgress&&p%10===0) opt.onProgress(p,max);
+    }
+    if(pdf.numPages>max) out.push(`（只讀取前 ${max} 頁）`);
+    return out.join("\n").replace(/[\u2E80-\u2FDF]/g,c=>c.normalize("NFKC"));
+  }
+  if(kind==="doc") throw new Error("舊版 .doc 讀不了，請另存成 .docx 或 PDF");
+  return "";
+}
+
+function renderFiles(){
+  const ul=$("files"); ul.innerHTML="";
+  docs.forEach(d=>{
+    const li=document.createElement("li");
+    li.innerHTML='<span class="ftype"></span><span style="min-width:0"><span class="fname"></span><span class="fmeta"></span></span><button type="button" aria-label="移除">移除</button>';
+    li.querySelector(".ftype").textContent=KIND_LABEL[d.kind];
+    li.querySelector(".fname").textContent=d.name;
+    const m=li.querySelector(".fmeta");
+    if(d.status==="loading") m.textContent="讀取中…";
+    else if(d.status==="error"){m.textContent=d.error;m.classList.add("err")}
+    else if(d.kind==="image") m.textContent=sample?"圖片會交給 AI 辨識文字":"圖片需在 Claude 中開啟才能辨識";
+    else m.textContent=`已讀取 ${d.text.trim().length.toLocaleString()} 字`;
+    li.querySelector("button").onclick=()=>{docs.splice(docs.indexOf(d),1);renderFiles()};
+    ul.append(li);
+  });
+}
+
+async function addFiles(list){
+  const arr=[...list]; if(!arr.length) return;
+  const added=arr.map(f=>{const d={id:++docSeq,name:f.name,kind:kindOf(f),text:"",blob:null,status:"loading",error:""};docs.push(d);return [d,f]});
+  renderFiles();
+  $("status").textContent=`正在讀取 ${arr.length} 個檔案…`;
+  await Promise.all(added.map(async([d,f])=>{
+    try{
+      if(d.kind==="image"){
+        if(f.size>20e6) throw new Error("圖片超過 20 MB");
+        d.blob=f;
+      }else{
+        d.text=(await extract(f,d.kind)).trim();
+        if(!d.text) throw new Error(d.kind==="pdf"?"這份 PDF 沒有文字層（可能是掃描檔），請截圖後以圖片匯入":"檔案裡沒有讀到文字");
+      }
+      d.status="ok";
+    }catch(e){d.status="error";d.error=e?.message==="load"?"讀取工具載入失敗，請檢查網路後重試":(e?.message||"這個檔案讀不出來")}
+  }));
+  renderFiles();
+  const ok=docs.filter(d=>d.status==="ok").length;
+  $("status").textContent=ok?`已匯入 ${ok} 個檔案，按「判斷重點」。`:"檔案沒有成功匯入，請看清單上的原因。";
+}
+
+$("file").onchange=e=>{addFiles(e.target.files);e.target.value=""};
+const drop=$("drop");
+["dragenter","dragover"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add("over")}));
+["dragleave","drop"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove("over")}));
+drop.addEventListener("drop",e=>addFiles(e.dataTransfer.files));
+document.addEventListener("dragover",e=>e.preventDefault());
+document.addEventListener("drop",e=>{e.preventDefault();if(st.tab==="book"){if(e.dataTransfer.files[0])importBook(e.dataTransfer.files[0]);return}if(!drop.contains(e.target))addFiles(e.dataTransfer.files)});
+$("src").addEventListener("paste",e=>{
+  const imgs=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith("image/"));
+  if(imgs.length){e.preventDefault();addFiles(imgs)}
+});
+$("clear").onclick=()=>{$("src").value="";save("vs_draft","");docs.length=0;renderFiles();$("status").textContent="";$("src").focus()};
+
+function gatherText(){
+  const parts=[];
+  const typed=$("src").value.trim();
+  if(typed) parts.push(typed);
+  docs.filter(d=>d.status==="ok"&&d.kind!=="image").forEach(d=>parts.push(`【檔案：${d.name}】\n${d.text}`));
+  return parts.join("\n\n");
+}
+function gatherImages(){return docs.filter(d=>d.status==="ok"&&d.kind==="image").map(d=>d.blob)}
+
+/* =================== 故事時間 =================== */
+const STORIES=[
+{id:"s1",title:"龜兔賽跑",tags:"寓言 兔子 烏龜 堅持 努力 驕傲 比賽",text:`森林裡住著一隻跑得很快的兔子，牠最喜歡笑烏龜：「你走路這麼慢，什麼時候才走得到啊？」
+烏龜慢慢抬起頭說：「那我們來比賽吧，看誰先跑到山腳下的大樹。」
+比賽一開始，兔子一溜煙就跑得不見了。牠回頭一看，烏龜還在起點附近。兔子打了個哈欠：「我先睡一下也贏得了。」
+烏龜一步、一步，從來沒有停下來。牠經過睡著的兔子，繼續往前爬。
+等兔子醒來，拚命往終點衝的時候，烏龜已經站在大樹下了。
+兔子紅著臉說：「原來，一直不放棄的人才會贏。」`},
+{id:"s2",title:"獅子與老鼠",tags:"寓言 獅子 老鼠 幫助 報恩 友誼 小也能幫大忙",text:`有一天，獅子在樹下睡午覺，一隻小老鼠不小心爬到牠的鼻子上。
+獅子醒來，一掌抓住小老鼠：「好大的膽子！」
+小老鼠發著抖說：「大王，請放了我。說不定有一天，我也能幫上您的忙。」
+獅子哈哈大笑：「你這麼小，能幫我什麼？」不過牠還是把小老鼠放走了。
+過了幾天，獅子掉進獵人的網子，怎麼掙扎都出不來，只能大聲吼叫。
+小老鼠聽見了，立刻跑過來，用尖尖的牙齒一口一口咬斷繩子。
+獅子終於自由了。牠低下頭說：「謝謝你，小朋友。原來再小的朋友，也能幫上大忙。」`},
+{id:"s3",title:"北風與太陽",tags:"寓言 北風 太陽 溫柔 力量 比賽 天氣",text:`北風和太陽在天上吵架，都說自己的力氣比較大。
+這時，路上走來一位穿著大衣的旅人。太陽說：「誰能讓他把大衣脫下來，誰就贏。」
+北風先來。牠呼呼地吹，吹得樹葉亂飛。可是風越大，旅人就把大衣抓得越緊。
+輪到太陽了。太陽笑咪咪地，慢慢把溫暖的陽光灑下來。
+旅人擦擦汗說：「好熱啊！」就自己把大衣脫了下來。
+北風這才明白：溫柔的方法，有時候比用力更有用。`},
+{id:"s4",title:"螞蟻與蚱蜢",tags:"寓言 螞蟻 蚱蜢 夏天 冬天 準備 勤勞",text:`夏天的草地上，螞蟻們排成一列，忙著把食物搬回家。
+蚱蜢躺在葉子上唱歌：「天氣這麼好，為什麼不跟我一起玩？」
+螞蟻說：「冬天快來了，我們要先把食物存起來。」
+蚱蜢搖搖頭：「冬天還早呢！」又繼續唱歌。
+冬天真的來了，雪蓋住了整片草地。蚱蜢又冷又餓，敲了敲螞蟻的門。
+螞蟻請牠進來，分給牠一點食物。蚱蜢小聲地說：「明年夏天，我也要一邊唱歌，一邊做準備。」`},
+{id:"s5",title:"放羊的孩子",tags:"寓言 狼來了 誠實 說謊 信任 羊",text:`山坡上，有個孩子每天負責看羊。他覺得好無聊，就大喊：「狼來了！狼來了！」
+村子裡的大人拿著棍子跑上山，卻什麼也沒看到。孩子哈哈大笑。
+過了幾天，他又喊：「狼來了！」大人們又跑上來，結果還是被騙了。
+有一天，狼真的來了。孩子嚇得大叫：「狼真的來了！快來救救我的羊！」
+可是這一次，再也沒有人相信他。
+孩子難過地說：「我以後再也不說謊了。說真話，別人才會相信我。」`},
+{id:"s6",title:"烏鴉喝水",tags:"寓言 烏鴉 聰明 想辦法 動腦 石頭",text:`天氣好熱，一隻烏鴉口渴得不得了，到處找水喝。
+牠找到一個瓶子，裡面有水，可是水太少了，嘴巴伸不進去。
+烏鴉歪著頭想：「怎麼辦呢？」
+牠看到旁邊有好多小石頭，就叼起一顆，丟進瓶子裡。一顆、兩顆、三顆……
+水慢慢升高，升到了瓶口。
+烏鴉開心地喝到了水：「只要肯動腦，就會找到辦法！」`},
+{id:"s7",title:"三隻小豬",tags:"童話 小豬 大野狼 房子 努力 認真",text:`三隻小豬長大了，要各自蓋一間房子。
+豬大哥用稻草，一下子就蓋好了。豬二哥用木頭，也很快就完成了。豬小弟說：「我要用磚頭，雖然很累，但是最堅固。」
+大野狼來了，牠對著稻草屋大喊：「我吹一口氣，就把你的房子吹倒！」呼——稻草屋倒了，豬大哥趕快逃到二哥家。
+大野狼又吹倒了木頭屋，兩隻小豬一起跑到豬小弟的磚頭屋。
+大野狼用力吹，吹得臉都紅了，磚頭屋卻一動也不動。
+三隻小豬抱在一起說：「做事認真，才能保護大家！」`},
+{id:"s8",title:"守株待兔",tags:"成語 農夫 兔子 等待 努力 不勞而獲",text:`從前有一個農夫，每天都在田裡辛苦工作。
+有一天，一隻兔子跑得太快，一頭撞上田邊的樹樁，就這樣倒下了。
+農夫撿到兔子，好開心：「不用工作，也能有兔子吃！」
+從那天起，他不再種田，每天坐在樹樁旁邊等兔子撞上來。
+一天、兩天、好多天過去了，再也沒有兔子來。田裡的草長得比稻子還高。
+村裡的人都笑他。農夫這才知道：好運不會天天來，想要收穫，還是要自己努力。`},
+{id:"s9",title:"小紅母雞",tags:"童話 母雞 麵包 分享 幫忙 合作 勤勞",text:`小紅母雞在院子裡撿到幾顆麥子。牠問：「誰要幫我種麥子？」
+貓說：「不要。」狗說：「不要。」鴨子也說：「不要。」
+「那我自己種。」小紅母雞種下麥子，每天澆水。麥子長大了，牠又問：「誰要幫我割麥子？」大家還是說：「不要。」
+小紅母雞自己割麥、磨成麵粉，再烤成香噴噴的麵包。
+「誰要吃麵包呀？」
+貓、狗和鴨子全都跑過來：「我要！我要！」
+小紅母雞說：「下次一起幫忙，我們就一起分享。」第二年，大家都搶著來幫忙了。`},
+{id:"s10",title:"城市老鼠和鄉下老鼠",tags:"寓言 老鼠 城市 鄉下 知足 快樂 朋友",text:`鄉下老鼠請城市老鼠來家裡吃飯，桌上只有豆子和麥粒。
+城市老鼠說：「你吃得太簡單了，來城市看看吧！」
+到了城市，桌上有蛋糕、起司和水果。牠們正要開動，門突然打開了，一隻大貓衝了進來！
+兩隻老鼠嚇得躲進洞裡，心臟撲通撲通跳。
+鄉下老鼠說：「謝謝你的招待，不過我還是想回家。」
+牠回到安靜的小屋，吃著豆子，覺得好安心：「平平安安的生活，就是最好吃的晚餐。」`}
+];
+
+const KID_VOICES=[
+  {key:"v1",name:"溫柔姐姐",desc:"輕柔、慢慢講，適合睡前",pitch:1.2,rate:0.88,want:"f"},
+  {key:"v2",name:"慈祥爺爺",desc:"低沉、緩慢，像在講古",pitch:0.55,rate:0.78,want:"m"},
+  {key:"v3",name:"小兔寶寶",desc:"高高的童聲，活潑可愛",pitch:1.75,rate:0.98,want:"f"},
+  {key:"v4",name:"魔法精靈",desc:"輕快、神秘，適合冒險故事",pitch:1.45,rate:1.1,want:"f"},
+  {key:"v5",name:"熊爸爸",desc:"厚實、穩重，講話有力",pitch:0.7,rate:0.9,want:"m"},
+  {key:"v6",name:"月亮姊姊",desc:"像在耳邊說悄悄話，最適合入睡",pitch:1.1,rate:0.8,want:"f",premium:true},
+  {key:"v7",name:"森林奶奶",desc:"慢慢的、暖暖的，像在講古早故事",pitch:0.85,rate:0.78,want:"f",premium:true},
+  {key:"v8",name:"小熊弟弟",desc:"憨厚可愛的童聲",pitch:1.5,rate:0.9,want:"m",premium:true},
+  {key:"v9",name:"彩虹仙子",desc:"清亮輕盈，像在唱歌",pitch:1.6,rate:1.05,want:"f",premium:true},
+  {key:"v10",name:"海盜船長",desc:"豪邁有精神，適合冒險故事",pitch:0.65,rate:1.05,want:"m",premium:true}
+];
+const NARRATORS=[
+  {key:"n1",name:"說書老先生",desc:"低沉緩慢，抑揚頓挫",pitch:0.6,rate:0.85,want:"m",premium:true},
+  {key:"n2",name:"電台主持人",desc:"字正腔圓、節奏穩定",pitch:0.95,rate:1.05,want:"m",premium:true},
+  {key:"n3",name:"溫柔朗讀者",desc:"柔和清晰，長時間聽也不累",pitch:1.1,rate:0.92,want:"f",premium:true}
+];
+const SEC_PERSONAS=[
+  {key:"ya",name:"小雅・知性秘書",desc:"沉穩清楚，像在開晨會",pitch:1.05,rate:1.0,want:"f",premium:true},
+  {key:"qing",name:"小晴・甜美秘書",desc:"溫柔親切，帶著笑意",pitch:1.35,rate:0.95,want:"f",premium:true},
+  {key:"vivian",name:"Vivian・幹練秘書",desc:"俐落明快，重點一句到位",pitch:0.95,rate:1.15,want:"f",premium:true}
+];
+const ALL_PRESETS=[...KID_VOICES,...NARRATORS,...SEC_PERSONAS];
+const presetOf=key=>ALL_PRESETS.find(x=>x.key===key);
+const FEMALE=/ting|mei|sin-?ji|hsiao|xiao|huihui|hanhan|yaoyao|yating|female|女/i;
+const MALE=/yun|zhiwei|kangkang|li-?mu|yu-?shu|male|男|danny|wang|jun/i;
+const kidCfg=load("vs_kidvoices",{});
+const st={tab:load("vs_tab","sec"),filter:"all",limit:40,q:"",cur:null,voice:load("vs_kidvoice","v1"),dialog:load("vs_dialog",true),dialogVoice:load("vs_dialogvoice","v3"),speed:load("vs_speed",1),sents:[],idx:0,playing:false,token:0};
+let library=load("vs_lib",[]);
+function saveLib(){
+  try{localStorage.setItem("vs_lib",JSON.stringify(library))}
+  catch(e){$("storyStatus").textContent="書櫃空間滿了，請刪掉一些舊文件。"}
+}
+function addToLibrary(title,text,kind){
+  text=String(text||"").trim(); if(!text) return null;
+  const ex=library.find(d=>d.title===title&&d.kind===kind);
+  if(ex){ex.text=text.slice(0,60000);ex.added=Date.now();saveLib();return ex}
+  const d={id:"d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),title:title||"未命名文件",text:text.slice(0,60000),kind:kind||"doc",added:Date.now()};
+  library.unshift(d); saveLib(); return d;
+}
+
+/* tabs */
+function setTab(t){
+  st.tab=t; save("vs_tab",t);
+  ["sec","story","book","admin"].forEach(k=>{$("tab-"+k).hidden=t!==k;$("tabBtn-"+k).setAttribute("aria-selected",t===k)});
+  $("sub").textContent={sec:"貼上信件、訊息或會議紀錄。秘書會挑出緊急與重要的事，用三種不同聲音唸給你聽。",story:"搜尋故事或你的文件，選一個聲音，講給孩子聽。",book:"匯入整本書，自動分段，設定聽多久，下次從上次停下的地方接著念。",admin:"管理會員等級、功能開放和使用狀況。"}[t];
+  if(t==="admin") renderAdmin();
+  if(t==="story") renderResults();
+}
+$("tabBtn-sec").onclick=()=>setTab("sec");
+$("tabBtn-story").onclick=()=>setTab("story");
+$("tabBtn-book").onclick=()=>setTab("book");
+$("tabBtn-admin").onclick=()=>setTab("admin");
+
+/* 故事資料庫（stories.json，1000 篇） */
+let DB=[];
+const SHORT_CAT={"原創晚安故事":"原創","伊索寓言":"伊索","中國寓言與成語":"成語寓言","格林童話":"格林","中國神話與民間故事":"中國民間","安徒生童話":"安徒生","世界民間故事":"世界民間","日本與韓國民間故事":"日韓民間","世界經典童話":"世界經典"};
+let heard=new Set(load("vs_heard",[]));
+function markHeard(id){if(!id||heard.has(id))return;heard.add(id);save("vs_heard",[...heard].slice(-3000))}
+function buildCats(){
+  const sel=$("cat"); const cur=st.filter; sel.innerHTML="";
+  const cnt={}; DB.forEach(e=>cnt[e.cat]=(cnt[e.cat]||0)+1);
+  const opts=[["all",`全部故事（溫馨優先）· ${DB.length}`],["warm",`最溫馨可愛 · ${DB.filter(e=>e.w===3).length}`],["unheard","還沒聽過的"]]
+    .concat(Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]).map(c=>[c,`${c} · ${cnt[c]}`]))
+    .concat([["mine",`我的書櫃 · ${library.length}`]]);
+  opts.forEach(([v,t])=>{const o=document.createElement("option");o.value=v;o.textContent=t;sel.append(o)});
+  sel.value=opts.some(o=>o[0]===cur)?cur:"all"; st.filter=sel.value;
+}
+async function loadDB(){
+  try{
+    const r=await fetch("stories.json"); if(!r.ok) throw 0;
+    const arr=await r.json();
+    DB=arr.map(o=>({id:"k"+o.id,title:o.t,tags:o.g,cat:o.c,w:o.w,src:o.s,text:o.x,kind:"story"}));
+    const pd=DB.filter(e=>e.src!=="原創").length;
+    void pd;
+  }catch(e){
+    DB=STORIES.map(s=>({...s,cat:"經典童話",w:2,src:"改寫自公有領域故事",kind:"story"}));
+    $("libCount").textContent="故事庫載入失敗，先顯示 10 篇內建故事。請檢查網路後重新整理。";
+  }
+  dbLoaded=true; updateLibCount(); buildCats(); st.limit=40; renderResults();
+  const last=load("vs_laststory",null);
+  const pool=storyPool(); const first=pool.find(e=>e.id===last)||pool.find(e=>e.w===3)||pool[0];
+  if(first&&!st.playing) openEntry(first);
+  renderResults();
+}
+function storyPool(){
+  if(canUse("story_full")) return DB;
+  return DB.filter(e=>e.w===3).slice(0,100);
+}
+function allEntries(){
+  return [...storyPool(),...library];
+}
+function updateLibCount(){
+  if(!dbLoaded||!DB.length) return;
+  const pd=DB.filter(e=>e.src!=="原創").length;
+  let t=`故事庫共 ${DB.length} 篇：${pd} 篇改寫自公有領域的經典童話與寓言，${DB.length-pd} 篇原創晚安故事。你已經聽過 ${[...heard].filter(id=>id.startsWith("k")).length} 篇。`;
+  if(!canUse("story_full")) t+=" "+lockMsg("story_full");
+  $("libCount").textContent=t;
+}
+const KIND_TAG={story:"故事",ai:"AI 故事",doc:"文件",note:"文件"};
+function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function snippet(text,terms){
+  const flat=text.replace(/\s+/g," ");
+  let pos=-1;
+  for(const t of terms){const p=flat.toLowerCase().indexOf(t.toLowerCase());if(p>=0&&(pos<0||p<pos))pos=p}
+  let s=pos<0?flat.slice(0,60):flat.slice(Math.max(0,pos-20),pos+50);
+  if(pos>20) s="…"+s; if(flat.length>s.length) s+="…";
+  let h=esc(s);
+  terms.forEach(t=>{if(t){const re=new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi");h=h.replace(re,m=>`<mark>${m}</mark>`)}});
+  return h;
+}
+function search(){
+  const terms=st.q.trim().split(/\s+/).filter(Boolean);
+  const f=st.filter;
+  let list=allEntries().filter(e=>
+    f==="all"?true:
+    f==="warm"?(e.kind==="story"&&e.w===3):
+    f==="unheard"?(e.kind==="story"&&!heard.has(e.id)):
+    f==="mine"?(e.kind!=="story"):
+    e.cat===f);
+  if(!terms.length){
+    if(f==="all"||f==="unheard") list=list.map((e,i)=>({e,i})).sort((a,b)=>((b.e.w||0)-(a.e.w||0))||(a.i-b.i)).map(x=>x.e);
+    return list.map(e=>({e,score:0}));
+  }
+  return list.map(e=>{
+    const hay=(e.title+" "+(e.tags||"")+" "+e.text).toLowerCase();
+    let score=0;
+    for(const t of terms){
+      const tl=t.toLowerCase();
+      if(!hay.includes(tl)) return null;
+      if(e.title.toLowerCase().includes(tl)) score+=10;
+      if((e.tags||"").toLowerCase().includes(tl)) score+=5;
+      score+=Math.min(hay.split(tl).length-1,10);
+    }
+    return {e,score};
+  }).filter(Boolean).sort((a,b)=>b.score-a.score);
+}
+let dbLoaded=false;
+function renderResults(){
+  const box=$("results"); box.innerHTML="";
+  if(!dbLoaded){box.innerHTML='<p class="empty">正在載入故事庫…</p>';return}
+  const mo=$("cat").querySelector('option[value="mine"]'); if(mo) mo.textContent=`我的書櫃 · ${library.length}`;
+  const terms=st.q.trim().split(/\s+/).filter(Boolean);
+  const all=search(); const res=all.slice(0,st.limit||40);
+  if(!all.length){
+    const p=document.createElement("p"); p.className="empty";
+    p.textContent=st.filter==="mine"&&!library.length?"書櫃還沒有文件。匯入檔案或在下方新增，就能在這裡搜尋。":st.q.trim()?`找不到「${st.q}」。可以換個關鍵字或分類，或請 AI 講一個關於「${st.q}」的故事。`:"這個分類目前沒有故事。";
+    box.append(p);
+  }
+  res.forEach(({e})=>{
+    const b=document.createElement("button"); b.type="button"; b.className="res"+(st.cur?.id===e.id?" on":"");
+    b.innerHTML='<span class="res-top"><span class="res-title"></span><span class="tag"></span></span><span class="res-snip"></span>';
+    b.querySelector(".res-title").textContent=e.title;
+    if(heard.has(e.id)){const h=document.createElement("span");h.className="heard";h.textContent="✓";h.title="聽過了";b.querySelector(".res-title").prepend(h)}
+    b.querySelector(".tag").textContent=e.kind==="story"?(SHORT_CAT[e.cat]||e.cat||"故事"):(KIND_TAG[e.kind]||"文件");
+    b.querySelector(".res-snip").innerHTML=snippet(e.text,terms);
+    b.onclick=()=>{openEntry(e);renderResults();if(matchMedia("(max-width: 879px)").matches)$("readTitle").scrollIntoView({behavior:"smooth",block:"start"})};
+    box.append(b);
+  });
+  if(all.length>res.length){
+    const m=document.createElement("button"); m.type="button"; m.className="more";
+    m.textContent=`再顯示 40 篇（還有 ${all.length-res.length} 篇）`;
+    m.onclick=()=>{st.limit=(st.limit||40)+40;renderResults()};
+    box.append(m);
+  }
+  $("aiStory").textContent=st.q.trim()?`請 AI 講「${st.q.trim()}」的故事`:"請 AI 講一個故事";
+  $("aiStory").hidden=!sample;
+  $("age").hidden=!sample;
+}
+$("searchForm").onsubmit=e=>{e.preventDefault();st.q=$("q").value;st.limit=40;renderResults()};
+$("q").addEventListener("input",()=>{st.q=$("q").value;st.limit=40;renderResults()});
+$("cat").onchange=()=>{st.filter=$("cat").value;st.limit=40;$("results").scrollTop=0;renderResults()};
+$("randomBtn").onclick=()=>{
+  let pool=search().map(r=>r.e).filter(e=>e.kind==="story");
+  const fresh=pool.filter(e=>!heard.has(e.id)); if(fresh.length) pool=fresh;
+  if(!pool.length) pool=storyPool();
+  const e=pool[Math.floor(Math.random()*pool.length)]; if(!e) return;
+  openEntry(e); renderResults();
+  $("storyStatus").textContent=`隨機挑到〈${e.title}〉。`;
+  if(matchMedia("(max-width: 879px)").matches) $("readTitle").scrollIntoView({behavior:"smooth",block:"start"});
+};
+
+/* reader */
+function splitSentences(text){
+  const out=[];
+  text.split(/\n+/).forEach((para,pi)=>{
+    const parts=para.match(/[^。！？!?；;]+(?:[。！？!?；;]+[」』”]?)?|[」』”]+/g)||[];
+    let inQ=false;
+    parts.forEach(s=>{
+      if(!s.trim()) return;
+      const segs=[]; let buf="", q=inQ;
+      for(const ch of s){
+        if("「『“".includes(ch)){if(buf)segs.push({text:buf,quote:q});buf="";q=true;continue}
+        if("」』”".includes(ch)){if(buf)segs.push({text:buf,quote:q});buf="";q=false;continue}
+        buf+=ch;
+      }
+      if(buf) segs.push({text:buf,quote:q});
+      inQ=q;
+      out.push({text:s,para:pi,segs});
+    });
+  });
+  return out;
+}
+function openEntry(e){
+  stopStory(true);
+  st.cur=e; st.sents=splitSentences(e.text); st.idx=0;
+  $("readTitle").textContent=e.title;
+  $("readSrc").textContent=e.kind==="story"?(e.src==="原創"?`原創晚安故事`:(e.src||"")):(KIND_TAG[e.kind]||"文件")+"（書櫃）";
+  if(e.kind==="story") save("vs_laststory",e.id);
+  $("sDel").hidden=e.kind==="story";
+  renderStory(); updateStoryBtns();
+}
+function renderStory(){
+  const box=$("story"); box.innerHTML="";
+  if(!st.cur){box.innerHTML='<p style="color:var(--muted);font-family:var(--f-body);font-size:15px">從左邊挑一個故事或文件。</p>';return}
+  let p=null,lastPara=-1;
+  st.sents.forEach((s,i)=>{
+    if(s.para!==lastPara){p=document.createElement("p");box.append(p);lastPara=s.para}
+    const sp=document.createElement("span"); sp.className="sent"+(st.playing&&i===st.idx?" now":""); sp.textContent=s.text;
+    sp.onclick=()=>{st.idx=i;playStory()};
+    p.append(sp);
+  });
+}
+function markNow(){
+  const spans=$("story").querySelectorAll(".sent");
+  spans.forEach((s,i)=>s.classList.toggle("now",st.playing&&i===st.idx));
+  const cur=spans[st.idx];
+  if(cur&&st.playing){
+    const box=$("story"), top=cur.offsetTop;
+    if(top<box.scrollTop||top>box.scrollTop+box.clientHeight-40) box.scrollTo({top:top-60,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
+  }
+}
+
+/* kid voices */
+function pickKidVoices(){
+  const zh=voices.filter(v=>/^zh|cmn|yue/i.test(v.lang));
+  const pool=zh.length?zh:voices;
+  if(!pool.length) return; // 聲音清單還沒載入時不要動使用者存好的設定
+  const fem=pool.filter(v=>FEMALE.test(v.name)), mal=pool.filter(v=>MALE.test(v.name)&&!FEMALE.test(v.name));
+  let fi=0,mi=0;
+  ALL_PRESETS.forEach((k,i)=>{
+    const c=kidCfg[k.key] ||= {};
+    if(c.voice&&pool.some(v=>v.name===c.voice)) return;
+    const list=k.want==="m"?mal:fem;
+    const v=list.length?list[(k.want==="m"?mi++:fi++)%list.length]:pool[i%Math.max(pool.length,1)];
+    c.voice=v?v.name:"";
+  });
+}
+function kidUtter(text,key){
+  const k=presetOf(key)||KID_VOICES[0];
+  const c=kidCfg[k.key]||{};
+  const u=new SpeechSynthesisUtterance(text);
+  const v=voices.find(x=>x.name===c.voice);
+  if(v){u.voice=v;u.lang=v.lang}else u.lang="zh-TW";
+  u.pitch=Math.max(0,Math.min(2,c.pitch??k.pitch));
+  u.rate=Math.max(0.3,Math.min(2,(c.rate??k.rate)*st.speed));
+  return u;
+}
+function renderVoiceCards(){
+  const box=$("vcards"); box.innerHTML="";
+  KID_VOICES.forEach(k=>{
+    const b=document.createElement("button"); b.type="button"; b.className="vcard "+k.key; b.setAttribute("role","radio"); b.setAttribute("aria-checked",st.voice===k.key);
+    const locked=k.premium&&!canUse("premium_voices");
+    if(locked) b.classList.add("locked");
+    b.innerHTML='<span class="vname"></span><span class="vdesc"></span>'+(locked?'<span class="lock">🔒 進階聲音</span>':'');
+    b.querySelector(".vname").textContent=k.name; b.querySelector(".vdesc").textContent=k.desc;
+    b.onclick=()=>{
+      if(locked){$("storyStatus").textContent=lockMsg("premium_voices");return}
+      st.voice=k.key; save("vs_kidvoice",k.key); renderVoiceCards();
+      if(hasTTS&&!st.playing){stopAllSpeech();speechSynthesis.speak(kidUtter(`你好，我是${k.name}，我來講故事給你聽。`,k.key))}
+    };
+    box.append(b);
+  });
+  const dv=$("dialogVoice"); dv.innerHTML="";
+  KID_VOICES.forEach(k=>{const o=document.createElement("option");o.value=k.key;o.textContent=k.name;if(k.premium&&!canUse("premium_voices")){o.disabled=true;o.textContent+="（進階）"}dv.append(o)});
+  if(presetOf(st.voice)?.premium&&!canUse("premium_voices")) st.voice="v1";
+  if(presetOf(st.dialogVoice)?.premium&&!canUse("premium_voices")) st.dialogVoice="v3";
+  dv.value=st.dialogVoice;
+}
+function renderKidVoiceSettings(){
+  renderPresetSettings("kidVoices",[...KID_VOICES,...NARRATORS],"從前從前，有一隻小兔子。");
+  renderPresetSettings("secPersonaSettings",SEC_PERSONAS,"老闆早安，今天有三件重要的事要提醒您。");
+}
+function renderPresetSettings(wrapId,list,sampleText){
+  const wrap=$(wrapId); if(!wrap) return; wrap.innerHTML="";
+  if(!hasTTS){wrap.textContent="這個瀏覽器不支援語音朗讀。";return}
+  const zh=voices.filter(v=>/^zh|cmn|yue/i.test(v.lang));
+  const pool=zh.length?zh:voices;
+  list.forEach(k=>{
+    const c=kidCfg[k.key] ||= {};
+    const row=document.createElement("div"); row.className="vrow "+k.key;
+    row.innerHTML=`<span class="lvl" style="color:var(--c)">${k.name}</span><select aria-label="${k.name}使用的聲音"></select>
+      <div class="knobs"><label>語速<input type="range" min="0.5" max="1.5" step="0.05" data-k="rate"></label>
+      <label>音調<input type="range" min="0.3" max="2" step="0.05" data-k="pitch"></label>
+      <button class="play" type="button">試聽</button><button class="play" type="button" data-reset>還原</button></div>`;
+    const sel=row.querySelector("select");
+    pool.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=`${v.name} (${v.lang})`;sel.append(o)});
+    sel.value=c.voice||"";
+    const r=row.querySelector('[data-k="rate"]'), p=row.querySelector('[data-k="pitch"]');
+    r.value=c.rate??k.rate; p.value=c.pitch??k.pitch;
+    const upd=()=>{c.voice=sel.value;c.rate=+r.value;c.pitch=+p.value;save("vs_kidvoices",kidCfg)};
+    sel.onchange=upd; r.oninput=upd; p.oninput=upd;
+    row.querySelector(".play:not([data-reset])").onclick=()=>{stopAllSpeech();speechSynthesis.speak(kidUtter(sampleText,k.key))};
+    row.querySelector("[data-reset]").onclick=()=>{delete kidCfg[k.key];pickKidVoices();save("vs_kidvoices",kidCfg);renderKidVoiceSettings()};
+    wrap.append(row);
+  });
+  const note=document.createElement("p"); note.className="status";
+  note.textContent=zh.length>1?`這台裝置有 ${zh.length} 個中文聲音，每個角色會盡量分配不同的聲音（女聲角色優先用女聲），再用音調和語速做出區別。`:"這台裝置只有一個中文聲音，各角色靠音調和語速區分。用電腦版 Chrome 或 Edge 會有更多聲音可選。";
+  wrap.append(note);
+}
+
+/* playback: sentence by sentence (avoids long-utterance cutoffs; pause = stop and remember place) */
+function segments(sent){
+  const segs=st.dialog?sent.segs:[{text:sent.text,quote:false}];
+  return segs.filter(x=>x.text.replace(/[\s，,。：:、！？!?…]/g,""));
+}
+function speakSentence(token){
+  if(token!==st.token||!st.playing) return;
+  if(st.idx>=st.sents.length){st.playing=false;st.idx=0;markNow();$("storyStatus").textContent="故事講完了。";updateStoryBtns();return}
+  markNow();
+  const segs=segments(st.sents[st.idx]);
+  if(!segs.length){st.idx++;return speakSentence(token)}
+  segs.forEach((s,n)=>{
+    const u=kidUtter(s.text,s.quote?st.dialogVoice:st.voice);
+    if(n===segs.length-1){
+      u.onend=()=>{if(token!==st.token)return;st.errs=0;st.idx++;setTimeout(()=>speakSentence(token),120)};
+      u.onerror=e=>{if(token!==st.token)return;if(e.error==="interrupted"||e.error==="canceled")return;
+        if(++st.errs>=2){stopStory(false);st.errs=0;$("storyStatus").textContent="這台裝置的語音引擎無法朗讀，請確認已安裝中文語音後再試。";return}
+        st.idx++;setTimeout(()=>speakSentence(token),300)};
+    }
+    speechSynthesis.speak(u);
+  });
+}
+function playStory(){
+  if(!hasTTS){$("storyStatus").textContent="這個瀏覽器不支援語音朗讀。";return}
+  if(!st.cur){$("storyStatus").textContent="先從左邊選一個故事。";return}
+  if(st.cur.kind==="story"&&!storyPool().includes(st.cur)){$("storyStatus").textContent=lockMsg("story_full");return}
+  if(typeof bk!=="undefined"&&bk.playing) stopBook();
+  st.token++; speechSynthesis.cancel(); if(state.speaking>=0||state.active){state.speaking=-1;state.active=false;render()}
+  st.playing=true; st.errs=0; $("storyStatus").textContent="";
+  if(st.cur?.kind==="story") markHeard(st.cur.id);
+  track("stories");
+  updateStoryBtns(); speakSentence(st.token);
+}
+function stopStory(reset){
+  st.token++; const was=st.playing; st.playing=false; if(was&&hasTTS) speechSynthesis.cancel();
+  if(reset) st.idx=0;
+  markNow(); updateStoryBtns();
+}
+function updateStoryBtns(){
+  $("sPlay").textContent=st.playing?"▶ 講故事中…":(st.idx>0?"▶ 繼續講":"▶ 開始講");
+  $("sPlay").disabled=st.playing||!st.cur; $("sPause").disabled=!st.playing; $("sStop").disabled=!st.cur;
+}
+$("sPlay").onclick=playStory;
+$("sPause").onclick=()=>stopStory(false);
+$("sStop").onclick=()=>stopStory(true);
+$("sDel").onclick=()=>{
+  if(!st.cur||st.cur.kind==="story") return;
+  if($("sDel").dataset.armed!=="1"){$("sDel").dataset.armed="1";$("sDel").textContent="再按一次確定刪除";setTimeout(()=>{$("sDel").dataset.armed="";$("sDel").textContent="從書櫃刪除"},4000);return}
+  stopStory(true);
+  library=library.filter(d=>d.id!==st.cur.id); saveLib();
+  $("storyStatus").textContent=`已刪除「${st.cur.title}」。`;
+  st.cur=null; st.sents=[]; $("readTitle").textContent="選一個故事"; $("sDel").hidden=true; $("sDel").dataset.armed=""; $("sDel").textContent="從書櫃刪除";
+  renderStory(); renderResults(); updateStoryBtns();
+};
+$("dialog").checked=st.dialog;
+$("dialog").onchange=()=>{st.dialog=$("dialog").checked;save("vs_dialog",st.dialog)};
+$("dialogVoice").onchange=()=>{st.dialogVoice=$("dialogVoice").value;save("vs_dialogvoice",st.dialogVoice)};
+$("speed").value=st.speed;
+$("speed").oninput=()=>{st.speed=+$("speed").value;save("vs_speed",st.speed)};
+
+$("ndSave").onclick=()=>{
+  const t=$("ndText").value.trim();
+  if(!t){$("storyStatus").textContent="請先貼上內容。";return}
+  const d=addToLibrary($("ndTitle").value.trim()||t.slice(0,12),t,"note");
+  $("ndTitle").value="";$("ndText").value="";
+  $("storyStatus").textContent=`已把「${d.title}」存到書櫃。`;
+  openEntry(d); renderResults();
+};
+
+/* AI story */
+let aiCtl=null;
+$("aiStory").onclick=async()=>{
+  if(!sample) return;
+  if(!gate("ai_story",$("storyStatus"))) return;
+  const topic=st.q.trim();
+  const btn=$("aiStory"); btn.disabled=true;
+  $("storyStatus").textContent="AI 正在想故事…";
+  aiCtl=new AbortController();
+  try{
+    const prompt=`請用繁體中文寫一個給 ${$("age").value} 小朋友聽的故事，適合大聲朗讀。
+${topic?`主題或關鍵字：「${topic}」。如果這是一個公有領域的經典童話、寓言、成語或民間故事，請用你自己的話重新講一遍；如果是受版權保護的現代作品或卡通角色，請不要重述，改寫一個主題相似、角色全新的原創故事。`:"請自由發想一個溫暖、有趣的原創故事。"}
+要求：300 到 600 字；句子短、好唸；角色說的話用「」標出來；分成 5 到 10 段，每段一行；結尾溫和，帶一點小小的道理但不說教；內容適合兒童。
+只回覆 JSON：{"title":"故事名稱","text":"故事內文，段落之間用 \\n 分隔"}`;
+    const data=await sample.json(prompt,{modelTier:"default",cache:false,signal:aiCtl.signal,kind:"ai_story"});
+    if(!data||!data.text) throw {code:"invalid_json"};
+    track("aiStories");
+    const d=addToLibrary(String(data.title||topic||"AI 故事"),String(data.text),"ai");
+    $("storyStatus").textContent=`「${d.title}」已放進書櫃，按「開始講」就能聽。`;
+    openEntry(d); renderResults();
+  }catch(e){
+    const code=e&&e.code;
+    if(code!=="cancelled") $("storyStatus").textContent={email_unverified:"請先到信箱點驗證連結，完成 Email 驗證後才能請 AI 講故事。",not_granted:"你沒有允許這個頁面使用 Claude，所以無法請 AI 講故事。",rate_limited:"Claude 使用次數暫時用完，請稍後再試。",refused:"這個主題 AI 沒辦法寫，換個主題試試。",invalid_json:"AI 的回覆不完整，請再按一次。",session_expired:"請重新登入 Claude 後再試。"}[code]||"連線出了問題，請再按一次。";
+  }finally{btn.disabled=false}
+};
+
+/* hook into voices + file import */
+const _buildVoiceUI=buildVoiceUI;
+buildVoiceUI=function(){_buildVoiceUI();pickKidVoices();renderKidVoiceSettings()};
+if(hasTTS) speechSynthesis.onvoiceschanged=buildVoiceUI;
+pickKidVoices(); renderKidVoiceSettings();
+const _addFiles=addFiles;
+addFiles=async function(list){
+  await _addFiles(list);
+  docs.filter(d=>d.status==="ok"&&d.kind!=="image"&&!d.saved).forEach(d=>{addToLibrary(d.name,d.text,"doc");d.saved=true});
+  if(st.tab==="story") renderResults();
+};
+(async()=>{try{await window.claude?.use("sample")}catch(e){} renderResults()})();
+
+
+/* =================== 有聲書 =================== */
+const JSZIP="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+const CPM=240; // 朗讀速度 1.0× 時，每分鐘約 240 個中文字
+function units(t){const cjk=(t.match(/[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/g)||[]).length;const w=(t.match(/[A-Za-z0-9]+/g)||[]).length;return cjk+w*1.6}
+function fmtDur(u,speed){const m=u/CPM/(speed||1);if(m<1)return "不到 1 分鐘";if(m<60)return `約 ${Math.round(m)} 分鐘`;return `約 ${Math.floor(m/60)} 小時 ${Math.round(m%60)} 分`}
+
+const bookDB={db:undefined,mem:new Map(),
+  open(){
+    if(this.db!==undefined) return Promise.resolve(this.db);
+    return new Promise(res=>{
+      try{const r=indexedDB.open("vs_books",1);
+        r.onupgradeneeded=()=>r.result.createObjectStore("books",{keyPath:"id"});
+        r.onsuccess=()=>{this.db=r.result;res(this.db)}; r.onerror=r.onblocked=()=>{this.db=null;res(null)};
+      }catch(e){this.db=null;res(null)}
+    });
+  },
+  async put(b){this.mem.set(b.id,b);const db=await this.open();if(!db)return false;
+    return new Promise(res=>{try{const tx=db.transaction("books","readwrite");tx.objectStore("books").put(b);tx.oncomplete=()=>res(true);tx.onerror=tx.onabort=()=>res(false)}catch(e){res(false)}})},
+  async get(id){if(this.mem.has(id))return this.mem.get(id);const db=await this.open();if(!db)return null;
+    return new Promise(res=>{try{const r=db.transaction("books").objectStore("books").get(id);r.onsuccess=()=>{if(r.result)this.mem.set(id,r.result);res(r.result||null)};r.onerror=()=>res(null)}catch(e){res(null)}})},
+  async del(id){this.mem.delete(id);const db=await this.open();if(!db)return;try{db.transaction("books","readwrite").objectStore("books").delete(id)}catch(e){}}
+};
+
+let shelf=load("vs_shelf",[]);
+function saveShelf(){save("vs_shelf",shelf)}
+const bk={meta:null,book:null,segs:[],seg:0,sents:[],sent:0,playing:false,token:0,
+  timerMode:"0",timerEnd:0,timerRemain:0,stopSoon:false,announce:false,wake:null,
+  speed:load("vs_bkspeed",1),voice:load("vs_bkvoice","std"),auto:load("vs_bkauto",true)};
+const bstat=m=>{$("bookStatus").textContent=m};
+
+/* 章節偵測 */
+const HEAD=/^\s*(?:第\s*[0-9０-９一二三四五六七八九十百千萬零〇兩]+\s*[章回節卷集部篇幕話][^\n]{0,30}|(?:chapter|CHAPTER|Chapter)\s+[0-9IVXLCivxlc]+\b[^\n]{0,50}|序章|序言|序|楔子|引子|前言|自序|後記|后记|尾聲|尾声|終章|终章|番外[^\n]{0,20}|卷[一二三四五六七八九十百0-9]+[^\n]{0,20})\s*$/;
+function splitChapters(text){
+  const lines=text.replace(/\r\n?/g,"\n").split("\n");
+  const chs=[]; let cur={title:"開頭",lines:[]};
+  const push=()=>{const t=cur.lines.join("\n").replace(/\n{3,}/g,"\n\n").trim();if(t)chs.push({title:cur.title,text:t})};
+  for(const ln of lines){
+    if(ln.trim().length<=40&&HEAD.test(ln)){push();cur={title:ln.trim(),lines:[]}}
+    else cur.lines.push(ln);
+  }
+  push();
+  if(chs.length<2) return [{title:"全文",text:text.replace(/\r\n?/g,"\n").trim()}];
+  return chs;
+}
+
+/* EPUB */
+function resolvePath(base,href){
+  const out=[]; (base+href).split("/").forEach(p=>{if(p===".."){out.pop()}else if(p&&p!=="."){out.push(p)}});
+  return out.join("/");
+}
+function htmlToText(node){
+  let out="";
+  (function walk(n){
+    if(n.nodeType===3){out+=n.nodeValue.replace(/\s+/g," ");return}
+    if(n.nodeType!==1) return;
+    const tag=n.tagName.toLowerCase();
+    if(["script","style","rt","rp","head"].includes(tag)) return;
+    const block=/^(p|div|br|h[1-6]|li|tr|section|article|blockquote|pre|dd|dt)$/.test(tag);
+    if(block) out+="\n";
+    n.childNodes.forEach(walk);
+    if(block) out+="\n";
+  })(node);
+  return out.split("\n").map(s=>s.trim()).filter(Boolean).join("\n");
+}
+async function readEpub(f){
+  await loadScript(JSZIP);
+  const zip=await window.JSZip.loadAsync(await f.arrayBuffer());
+  const cx=await zip.file("META-INF/container.xml")?.async("text");
+  if(!cx) throw new Error("這個 EPUB 檔案格式不完整");
+  const opfPath=new DOMParser().parseFromString(cx,"application/xml").querySelector("rootfile")?.getAttribute("full-path");
+  const opfText=opfPath&&await zip.file(opfPath)?.async("text");
+  if(!opfText) throw new Error("這個 EPUB 檔案格式不完整");
+  const opf=new DOMParser().parseFromString(opfText,"application/xml");
+  const base=opfPath.includes("/")?opfPath.slice(0,opfPath.lastIndexOf("/")+1):"";
+  const man={}; [...opf.getElementsByTagNameNS("*","item")].forEach(i=>man[i.getAttribute("id")]=i.getAttribute("href"));
+  const title=opf.getElementsByTagNameNS("*","title")[0]?.textContent?.trim();
+  const refs=[...opf.getElementsByTagNameNS("*","itemref")];
+  const chapters=[];
+  for(let k=0;k<refs.length;k++){
+    const href=man[refs[k].getAttribute("idref")]; if(!href) continue;
+    let path; try{path=resolvePath(base,decodeURIComponent(href.split("#")[0]))}catch(e){path=resolvePath(base,href.split("#")[0])}
+    const html=await zip.file(path)?.async("text"); if(!html) continue;
+    const doc=new DOMParser().parseFromString(html,"text/html");
+    const t=htmlToText(doc.body||doc.documentElement);
+    if(t.replace(/\s/g,"").length<20) continue;
+    const h=(doc.querySelector("h1,h2,h3")?.textContent||doc.title||"").replace(/\s+/g," ").trim();
+    chapters.push({title:h.slice(0,40)||`第 ${chapters.length+1} 部分`,text:t});
+    if(k%10===0) bstat(`正在讀取 EPUB… ${k+1}/${refs.length}`);
+  }
+  if(!chapters.length) throw new Error("EPUB 裡沒有讀到文字");
+  return {title,chapters};
+}
+
+async function importBook(f){
+  if(!f) return;
+  const name=f.name.replace(/\.[^.]+$/,"");
+  bstat(`正在讀取《${name}》…`);
+  try{
+    let title=name, chapters;
+    if(/\.epub$/i.test(f.name)){const r=await readEpub(f);title=r.title||name;chapters=r.chapters}
+    else{
+      const kind=kindOf(f);
+      if(kind==="image") throw new Error("有聲書需要文字，圖片請改到「秘書簡報」辨識");
+      const t=await extract(f,kind,{maxPages:3000,onProgress:(p,m)=>bstat(`正在讀取 PDF… ${p}/${m} 頁`)});
+      if(!t.trim()) throw new Error(kind==="pdf"?"這份 PDF 沒有文字層（可能是掃描檔），無法朗讀":"檔案裡沒有讀到文字");
+      chapters=splitChapters(t);
+    }
+    await addBook(title,chapters);
+  }catch(e){bstat(e?.message==="load"?"讀取工具載入失敗，請檢查網路後重試。":(e?.message||"這個檔案讀不出來，請換成 TXT 或 EPUB。"))}
+}
+async function addBook(title,chapters){
+  const id="b"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  const ok=await bookDB.put({id,title,chapters});
+  const meta={id,title,chapterCount:chapters.length,u:chapters.reduce((a,c)=>a+units(c.text),0),
+    chars:chapters.reduce((a,c)=>a+c.text.length,0),added:Date.now(),pos:{ch:0,off:0},
+    mode:chapters.length>1?"chapter":"min",min:10,saved:ok};
+  shelf.unshift(meta); saveShelf();
+  await openBook(id);
+  bstat(`已加入《${title}》：${chapters.length>1?`找到 ${chapters.length} 章`:"沒找到章節標題，已改成依時間分段"}，全書${fmtDur(meta.u)}。`+(ok?"":"這個瀏覽器無法長期保存書的內容，重新整理後要再匯入一次。"));
+}
+
+/* 分段 */
+function chunk(text,limit){
+  if(units(text)<=limit*1.15) return [{start:0,end:text.length}];
+  const out=[]; const re=/\n+|[。！？!?][」』”]?/g; let m, prev=0, start=0, acc=0;
+  while((m=re.exec(text))){
+    const i=m.index+m[0].length;
+    acc+=units(text.slice(prev,i)); prev=i;
+    if(acc>=limit&&(m[0][0]==="\n"||acc>=limit*1.1)){out.push({start,end:i});start=i;acc=0}
+  }
+  if(start<text.length){
+    if(out.length&&units(text.slice(start))<limit*0.25) out[out.length-1].end=text.length;
+    else out.push({start,end:text.length});
+  }
+  return out;
+}
+function buildSegs(){
+  const meta=bk.meta, segs=[];
+  const limit=meta.mode==="chapter"?30*CPM:meta.min*CPM;
+  bk.book.chapters.forEach((c,ci)=>{
+    const pieces=chunk(c.text,limit);
+    pieces.forEach((p,pi)=>segs.push({ch:ci,start:p.start,end:p.end,
+      title:c.title+(pieces.length>1?`（${pi+1}/${pieces.length}）`:""),u:units(c.text.slice(p.start,p.end))}));
+  });
+  return segs;
+}
+function bookSentences(seg){
+  const txt=bk.book.chapters[seg.ch].text.slice(seg.start,seg.end);
+  const list=splitSentences(txt); let cur=0;
+  list.forEach(s=>{const i=txt.indexOf(s.text,cur);s.off=i<0?cur:i;cur=s.off+s.text.length});
+  return list;
+}
+function setSeg(i,sentIdx=0){
+  bk.seg=Math.max(0,Math.min(i,bk.segs.length-1));
+  bk.sents=bookSentences(bk.segs[bk.seg]);
+  bk.sent=Math.max(0,Math.min(sentIdx,bk.sents.length));
+  renderBookText(); renderSegs(); updateBookUI();
+}
+function locate(){
+  const p=bk.meta.pos||{ch:0,off:0};
+  let i=bk.segs.findIndex(s=>s.ch===p.ch&&p.off>=s.start&&p.off<s.end);
+  if(i<0) i=Math.max(0,bk.segs.findIndex(s=>s.ch>=p.ch));
+  bk.seg=i; const sents=bookSentences(bk.segs[i]); let si=0;
+  sents.forEach((s,k)=>{if(bk.segs[i].start+s.off<=p.off)si=k});
+  setSeg(i,si);
+}
+function savePos(){
+  if(!bk.meta||!bk.segs.length) return;
+  const seg=bk.segs[bk.seg], s=bk.sents[Math.min(bk.sent,bk.sents.length-1)];
+  bk.meta.pos={ch:seg.ch,off:seg.start+(s?s.off:0)}; bk.meta.last=Date.now(); bk.meta.lastPct=progressPct(); saveShelf();
+}
+function progressPct(){
+  if(!bk.book) return 0;
+  const p=bk.meta.pos; let done=0;
+  bk.book.chapters.forEach((c,i)=>{if(i<p.ch)done+=c.text.length});
+  return Math.min(100,(done+p.off)/Math.max(1,bk.meta.chars)*100);
+}
+
+/* 畫面 */
+async function openBook(id){
+  stopBook();
+  const meta=shelf.find(b=>b.id===id); if(!meta) return;
+  const book=await bookDB.get(id);
+  if(!book){bstat(`《${meta.title}》的內容已不在這台裝置上，請重新匯入。`);return}
+  bk.meta=meta; bk.book=book; save("vs_bkcur",id);
+  $("bkMode").value=meta.mode; $("bkMin").value=String(meta.min);
+  bk.segs=buildSegs(); locate(); renderShelf();
+}
+function renderShelf(){
+  const ul=$("shelf"); ul.innerHTML="";
+  if(!shelf.length){const li=document.createElement("li");li.style.display="block";li.innerHTML='<span class="bm">書架是空的。選一本書匯入，或貼上全文。</span>';ul.append(li);return}
+  shelf.forEach(b=>{
+    const li=document.createElement("li"); if(bk.meta?.id===b.id) li.className="on";
+    li.innerHTML='<button class="bt" type="button"></button><span class="bm"></span><span class="bx"><button type="button" class="del">刪除</button></span>';
+    li.querySelector(".bt").textContent=`《${b.title}》`;
+    const pct=bk.meta?.id===b.id?progressPct():(()=>{return b.lastPct||0})();
+    li.querySelector(".bm").textContent=`${b.chapterCount} 章 · ${fmtDur(b.u)} · 已聽 ${Math.round(pct)}%`;
+    li.querySelector(".bt").onclick=()=>openBook(b.id);
+    const del=li.querySelector(".del");
+    del.onclick=async()=>{
+      if(del.dataset.armed!=="1"){del.dataset.armed="1";del.textContent="確定刪除？";setTimeout(()=>{del.dataset.armed="";del.textContent="刪除"},4000);return}
+      if(bk.meta?.id===b.id){stopBook();bk.meta=null;bk.book=null;bk.segs=[];bk.sents=[];renderBookText();renderSegs();updateBookUI()}
+      shelf=shelf.filter(x=>x.id!==b.id); saveShelf(); await bookDB.del(b.id); renderShelf();
+      bstat(`已刪除《${b.title}》。`);
+    };
+    ul.append(li);
+  });
+}
+function renderBookText(){
+  const box=$("bkText"); box.innerHTML=""; box.scrollTop=0;
+  if(!bk.book){box.innerHTML='<p style="color:var(--muted);font-family:var(--f-body);font-size:15px;font-weight:400">從書架選一本書，或匯入新書。</p>';return}
+  let p=null,last=-1;
+  bk.sents.forEach((s,i)=>{
+    if(s.para!==last){p=document.createElement("p");box.append(p);last=s.para}
+    const sp=document.createElement("span"); sp.className="sent"; sp.textContent=s.text;
+    sp.onclick=()=>{bk.sent=i;savePos();playBook()};
+    p.append(sp);
+  });
+  markBook();
+}
+function markBook(){
+  const spans=$("bkText").querySelectorAll(".sent");
+  spans.forEach((s,i)=>s.classList.toggle("now",i===bk.sent&&(bk.playing||bk.sent>0)));
+  const cur=spans[bk.sent], box=$("bkText");
+  if(cur&&(bk.playing||bk.sent>0)){
+    const top=cur.offsetTop;
+    if(top<box.scrollTop||top>box.scrollTop+box.clientHeight-40) box.scrollTo({top:top-60,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches||!bk.playing?"auto":"smooth"});
+  }
+}
+function renderSegs(){
+  const ol=$("segs"); ol.innerHTML="";
+  $("segSummary").textContent=bk.segs.length?`全部分段（${bk.segs.length} 段）`:"全部分段";
+  bk.segs.forEach((s,i)=>{
+    const li=document.createElement("li"); const b=document.createElement("button"); b.type="button";
+    b.className=(i<bk.seg?"done":"")+(i===bk.seg?" cur":"");
+    b.innerHTML='<span class="sn"></span><span class="sd tnum"></span>';
+    b.querySelector(".sn").textContent=(i<bk.seg?"✓ ":"")+s.title;
+    b.querySelector(".sd").textContent=fmtDur(s.u,bk.speed).replace("約 ","");
+    b.onclick=()=>jumpSeg(i);
+    li.append(b); ol.append(li);
+  });
+}
+function updateBookUI(){
+  const has=!!bk.book;
+  $("bkTitle").textContent=has?`《${bk.meta.title}》`:"還沒選書";
+  $("bkMeta").textContent=has?`${bk.meta.chapterCount} 章 · 分成 ${bk.segs.length} 段 · 全書${fmtDur(bk.meta.u,bk.speed)}`:"";
+  $("bkBar").style.width=(has?progressPct():0)+"%";
+  const seg=bk.segs[bk.seg];
+  $("bkSegLabel").textContent=has&&seg?`第 ${bk.seg+1} / ${bk.segs.length} 段 · ${seg.title} · ${fmtDur(seg.u,bk.speed)}`:"";
+  $("bkPlay").textContent=bk.playing?"⏸ 暫停":(has&&(bk.sent>0||bk.seg>0)?"▶ 繼續聽":"▶ 播放");
+  $("bkPlay").disabled=!has; $("bkPrev").disabled=!has||bk.seg<=0; $("bkNext").disabled=!has||bk.seg>=bk.segs.length-1;
+  $("bkMinWrap").hidden=bk.meta?.mode==="chapter";
+  tickTimer();
+}
+
+/* 播放 */
+function bookUtter(text){
+  if(bk.voice==="std"){
+    const u=new SpeechSynthesisUtterance(text); const v=voices[0];
+    if(v){u.voice=v;u.lang=v.lang}else u.lang="zh-TW";
+    u.rate=Math.max(0.3,Math.min(2.5,bk.speed)); u.pitch=1; return u;
+  }
+  const u=kidUtter(text,bk.voice);
+  const k=presetOf(bk.voice)||KID_VOICES[0], c=kidCfg[k.key]||{};
+  u.rate=Math.max(0.3,Math.min(2.5,(c.rate??k.rate)*bk.speed)); return u;
+}
+function pieces(text){ // 長句再切小，避免部分瀏覽器念到一半中斷
+  if(text.length<=120) return [text];
+  const out=[]; let buf="";
+  text.split(/(?<=[，,、；;：:])/).forEach(p=>{if((buf+p).length>120&&buf){out.push(buf);buf=p}else buf+=p});
+  if(buf) out.push(buf);
+  return out.flatMap(s=>s.length>160?s.match(/.{1,140}/gs):[s]);
+}
+function speakPieces(list,token,done){
+  list.forEach((t,n)=>{
+    const u=bookUtter(t);
+    if(n===list.length-1){
+      u.onend=()=>{if(token===bk.token){bk.errs=0;done()}};
+      u.onerror=e=>{if(token!==bk.token||e.error==="interrupted"||e.error==="canceled")return;
+        if(++bk.errs>=2){bk.errs=0;stopBook();bstat("這台裝置的語音引擎無法朗讀，請確認已安裝中文語音後再試。進度沒有變動。");return}
+        setTimeout(done,300)};
+    }
+    speechSynthesis.speak(u);
+  });
+}
+function nextSegAndStop(msg){
+  if(bk.seg+1<bk.segs.length) setSeg(bk.seg+1,0); else bk.sent=0;
+  savePos(); finishTimer(msg);
+}
+function speakBook(token){
+  if(token!==bk.token||!bk.playing) return;
+  if(bk.stopSoon){finishTimer("時間到，已停止。進度已記住，下次從這裡接著念。");return}
+  if(bk.sent>=bk.sents.length){
+    const endedCh=bk.segs[bk.seg].ch;
+    if(bk.seg+1>=bk.segs.length){bk.sent=0;finishTimer(`《${bk.meta.title}》全部念完了！`);return}
+    if(bk.timerMode==="seg"){nextSegAndStop("這段念完了，已停止。");return}
+    if(bk.timerMode==="chap"&&bk.segs[bk.seg+1].ch!==endedCh){nextSegAndStop("這章念完了，已停止。");return}
+    if(!bk.auto){setSeg(bk.seg+1,0);savePos();stopBook();bstat("這段念完了，按播放繼續下一段。");return}
+    setSeg(bk.seg+1,0); bk.announce=bk.segs[bk.seg].ch!==endedCh;
+  }
+  savePos(); markBook(); $("bkBar").style.width=progressPct()+"%";
+  if(bk.announce&&bk.sent===0){
+    bk.announce=false;
+    const t=bk.book.chapters[bk.segs[bk.seg].ch].title;
+    if(t&&t!=="全文"&&t!=="開頭"){speakPieces([t+"。"],token,()=>setTimeout(()=>speakBook(token),400));return}
+  }
+  const s=bk.sents[bk.sent];
+  speakPieces(pieces(s.text),token,()=>{bk.sent++;setTimeout(()=>speakBook(token),60)});
+}
+async function playBook(){
+  if(!hasTTS){bstat("這個瀏覽器不支援語音朗讀。");return}
+  if(!bk.book) return;
+  if(st.playing) stopStory(false);
+  if(state.speaking>=0){state.speaking=-1;render()}
+  const tk=++bk.token; speechSynthesis.cancel();
+  if(state.active){state.active=false}
+  bk.playing=true; bk.stopSoon=false; bk.errs=0;
+  if(bk.timerRemain>0&&!bk.timerEnd) bk.timerEnd=Date.now()+bk.timerRemain;
+  if(bk.sent>=bk.sents.length) bk.sent=0;
+  updateBookUI(); bstat("");
+  let w=null; try{w=await navigator.wakeLock?.request("screen")}catch(e){}
+  if(tk!==bk.token||!bk.playing){try{w?.release()}catch(e){} return}
+  bk.wake=w; speakBook(tk);
+}
+function stopBook(){
+  bk.token++; const was=bk.playing; bk.playing=false; bk.stopSoon=false;
+  if(was&&hasTTS) speechSynthesis.cancel();
+  if(bk.timerEnd){bk.timerRemain=Math.max(0,bk.timerEnd-Date.now());bk.timerEnd=0}
+  try{bk.wake?.release()}catch(e){} bk.wake=null;
+  savePos(); markBook(); if(bk.book){updateBookUI();renderShelf()}
+}
+function finishTimer(msg){
+  stopBook(); bk.timerMode="0"; bk.timerRemain=0; $("bkTimer").value="0"; updateBookUI(); bstat(msg);
+}
+function jumpSeg(i){
+  const was=bk.playing; stopBook(); setSeg(i,0); savePos(); updateBookUI(); if(was) playBook();
+}
+function tickTimer(){
+  const el=$("bkTimerLeft");
+  const ms=bk.timerEnd?bk.timerEnd-Date.now():bk.timerRemain;
+  if(/^\d+$/.test(bk.timerMode)&&bk.timerMode!=="0"&&ms>0){
+    const s=Math.ceil(ms/1000); el.hidden=false;
+    el.textContent=`⏱ ${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}${bk.playing?"":"（暫停中）"}`;
+  }else if(bk.timerMode==="seg"||bk.timerMode==="chap"){el.hidden=false;el.textContent=bk.timerMode==="seg"?"⏱ 這段念完停":"⏱ 這章念完停"}
+  else el.hidden=true;
+  if(bk.playing&&bk.timerEnd&&Date.now()>=bk.timerEnd) bk.stopSoon=true;
+}
+setInterval(tickTimer,1000);
+
+/* 控制項 */
+$("bkPlay").onclick=()=>bk.playing?(stopBook(),bstat("已暫停，進度已記住。")):playBook();
+$("bkPrev").onclick=()=>jumpSeg(bk.seg-1);
+$("bkNext").onclick=()=>jumpSeg(bk.seg+1);
+$("bkMode").onchange=()=>{if(!bk.meta)return;const was=bk.playing;stopBook();bk.meta.mode=$("bkMode").value;saveShelf();bk.segs=buildSegs();locate();if(was)playBook()};
+$("bkMin").onchange=()=>{if(!bk.meta)return;const was=bk.playing;stopBook();bk.meta.min=+$("bkMin").value;saveShelf();bk.segs=buildSegs();locate();if(was)playBook()};
+$("bkTimer").onchange=()=>{
+  bk.timerMode=$("bkTimer").value; bk.timerEnd=0; bk.timerRemain=0; bk.stopSoon=false;
+  if(/^\d+$/.test(bk.timerMode)&&bk.timerMode!=="0"){bk.timerRemain=+bk.timerMode*60000;if(bk.playing){bk.timerEnd=Date.now()+bk.timerRemain}}
+  tickTimer();
+};
+$("bkAuto").checked=bk.auto;
+$("bkAuto").onchange=()=>{bk.auto=$("bkAuto").checked;save("vs_bkauto",bk.auto)};
+$("bkSpeed").value=bk.speed; $("bkSpeedVal").textContent=(+bk.speed).toFixed(1)+"×";
+$("bkSpeed").oninput=()=>{bk.speed=+$("bkSpeed").value;save("vs_bkspeed",bk.speed);$("bkSpeedVal").textContent=bk.speed.toFixed(1)+"×";if(bk.book){updateBookUI();renderSegs()}};
+function renderBookVoices(){
+  const sel=$("bkVoice"); sel.innerHTML="";
+  const lock=!canUse("premium_voices");
+  const add=(parent,k)=>{const o=document.createElement("option");o.value=k.key;o.textContent=k.name+(k.premium&&lock?"（進階）":"");if(k.premium&&lock)o.disabled=true;parent.append(o)};
+  add(sel,{key:"std",name:"標準朗讀"});
+  const g1=document.createElement("optgroup");g1.label="說書人";NARRATORS.forEach(k=>add(g1,k));sel.append(g1);
+  const g2=document.createElement("optgroup");g2.label="講故事的聲音";KID_VOICES.forEach(k=>add(g2,k));sel.append(g2);
+  if(presetOf(bk.voice)?.premium&&lock) bk.voice="std";
+  sel.value=bk.voice;
+}
+renderBookVoices();
+$("bkVoice").onchange=()=>{bk.voice=$("bkVoice").value;save("vs_bkvoice",bk.voice);if(bk.playing){stopBook();playBook()}};
+$("bookFile").onchange=e=>{importBook(e.target.files[0]);e.target.value=""};
+const bdrop=$("bookDrop");
+["dragenter","dragover"].forEach(t=>bdrop.addEventListener(t,e=>{e.preventDefault();bdrop.classList.add("over")}));
+["dragleave","drop"].forEach(t=>bdrop.addEventListener(t,e=>{e.preventDefault();bdrop.classList.remove("over")}));
+bdrop.addEventListener("drop",e=>{e.stopPropagation();importBook(e.dataTransfer.files[0])});
+$("pbSave").onclick=async()=>{
+  const t=$("pbText").value.trim();
+  if(!gate("audiobook",$("bookStatus"))) return;
+  if(t.length<20){bstat("請先貼上書的內容。");return}
+  await addBook($("pbTitle").value.trim()||t.split("\n")[0].slice(0,20)||"未命名的書",splitChapters(t));
+  $("pbTitle").value=""; $("pbText").value="";
+};
+window.addEventListener("pagehide",savePos);
+renderShelf(); updateBookUI(); renderBookText();
+(async()=>{const id=load("vs_bkcur",null);if(id&&shelf.some(b=>b.id===id))await openBook(id)})();
+
+
+/* =================== 會員系統：後端、使用紀錄、後台 =================== */
+const SITE=window.SITE_CONFIG||null;
+/* App 模式（Android App 用）：SITE_CONFIG.app = "secretary" | "stories" | "audiobook"（單一功能）| "all"（三合一） */
+const APP_INFO={
+  secretary:{tab:"sec",title:"聲音秘書",sub:"貼上信件、訊息或會議紀錄。秘書會挑出緊急與重要的事，唸給你聽。",feats:["ai_analyze","file_import","premium_voices"],usage:["analyze","imports"]},
+  stories:{tab:"story",title:"睡前故事屋",sub:"一千篇溫馨的睡前故事，十種聲音陪孩子入睡。",feats:["story_full","ai_story","premium_voices"],usage:["stories","aiStories"]},
+  audiobook:{tab:"book",title:"說書人有聲書",sub:"匯入整本書，自動分段，設定聽多久，下次從上次停下的地方接著念。",feats:["audiobook","file_import","premium_voices"],usage:["bookMin","imports"]},
+  all:{tab:null,title:"聲音秘書全能版",sub:"秘書簡報、睡前故事、有聲書，一個 App 全部都有。",feats:null,usage:null}
+};
+const APP=SITE&&APP_INFO[SITE.app]?SITE.app:null;
+const NS=APP?`apps/${APP}/`:"";
+const IS_NATIVE=!!window.Capacitor?.isNativePlatform?.();
+const SINGLE=APP&&APP_INFO[APP].tab?APP:null; // 單一功能的 App
+const appFeatures=()=>SINGLE?FEATURES.filter(f=>APP_INFO[APP].feats.includes(f[0])):FEATURES;
+const appUsage=()=>SINGLE?USAGE_KEYS.filter(u=>APP_INFO[APP].usage.includes(u[0])):USAGE_KEYS;
+// App 安裝包裡的 Firebase 設定還是範本（YOUR_...）時，當成「測試模式」：不連會員系統、所有功能開放，方便先在手機上試用
+const FB_READY=!!(SITE&&SITE.firebase&&!/^YOUR_/.test(SITE.firebase.apiKey||""));
+const USAGE_KEYS=[["analyze","秘書判斷"],["imports","匯入檔案"],["stories","聽故事"],["aiStories","AI 故事"],["bookMin","有聲書（分鐘）"]];
+let B=null;
+
+function track(key,n=1){
+  if(M.mode==="local"||!M.me?.id||!M.member||!n) return;
+  M.member.usage ||= {};
+  M.member.usage[key]=(M.member.usage[key]||0)+n;
+  M.member.lastSeen=Date.now(); M.dirty=true; scheduleFlush();
+}
+let flushTimer=null, flushing=false;
+function scheduleFlush(){ if(flushTimer) return; flushTimer=setTimeout(()=>{flushTimer=null;flush()},15000); }
+async function flush(){
+  if(!M.dirty||flushing||!B||!M.me?.id||M.canWrite===false) return;
+  flushing=true; M.dirty=false;
+  try{ await B.saveMember(JSON.parse(JSON.stringify(M.member))); if(M.canWrite!==true){M.canWrite=true;renderMemChip()} }
+  catch(e){
+    const c=e&&e.code;
+    if(c==="invalid_argument"||c==="permission-denied"){M.canWrite=false;renderMemChip()}
+    else if(c==="quota_exceeded"){M.canWrite=false;renderMemChip()}
+    else M.dirty=true;
+  }finally{flushing=false}
+}
+window.addEventListener("pagehide",()=>{flush()});
+setInterval(()=>{ if(typeof bk!=="undefined"&&bk.playing) track("bookMin"); },60000);
+
+/* ---- Claude 平台：用 Claude 帳號登入，資料放在這個頁面的資料庫 ---- */
+const ClaudeBackend={
+  label:"Claude 帳號",
+  async init(){
+    if(!window.claude?.use) return false;
+    const [db,user]=await Promise.all([claude.use("db").catch(()=>null),claude.use("user").catch(()=>null)]);
+    this.db=db; this.user=user;
+    // 拿不到使用者或資料庫時一律當成訪客（不會因為平台能力缺少而全部開放）；擁有者／編輯者身分仍以 user 判斷
+    const me=user?await user.me().catch(()=>null):null;
+    if(me){ M.me={id:me.id,name:me.name,avatar:me.avatarUrl}; M.isOwner=!!me.isOwner; M.isAdmin=!!(me.isOwner||me.canEdit); }
+    M.tier=me&&me.id&&db?"free":"guest";
+    if(!db) return false;
+    db.doc("config/features").onSnapshot(s=>{M.matrix=mergeMatrix(s.exists?s.data().matrix:null);onMembership()},()=>{});
+    if(me&&me.id){
+      db.doc("tiers/"+me.id).onSnapshot(s=>{const t=s.exists?s.data().tier:null;M.tier=TIER_KEYS.includes(t)?t:"free";onMembership()},()=>{});
+      let snap=null; try{snap=await db.doc("members/"+me.id).get()}catch(e){}
+      M.member=snap?.exists?JSON.parse(JSON.stringify(snap.data())):{joinedAt:Date.now(),usage:{}};
+      M.member.visits=(M.member.visits||0)+1; M.member.lastSeen=Date.now(); M.dirty=true;
+      flush();
+    }
+    return true;
+  },
+  saveMember(m){ return this.db.doc("members/"+M.me.id).set(m); },
+  watchMembers(cb){ return this.db.collection("members").onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());cb(o)},e=>cb(null,e)); },
+  watchTiers(cb){ return this.db.collection("tiers").onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data().tier);cb(o)},e=>cb(null,e)); },
+  watchAdmins(cb){ cb({}); return ()=>{}; },
+  setTier(id,t){ return this.db.doc("tiers/"+id).set({tier:t,by:M.me.id,at:Date.now()}); },
+  setMatrix(m){ return this.db.doc("config/features").set({matrix:m,at:Date.now()}); },
+  async profiles(ids){
+    const ps=ids.length?await this.user.profiles(ids):{}; const o={};
+    ids.forEach(id=>{const p=ps[id]||{};o[id]={name:p.name||"",avatar:p.avatarUrl||"",guest:!!p.guest}});
+    return o;
+  },
+  async search(q){ const r=await this.user.search(q); return r.map(p=>({id:p.id,name:p.name,avatar:p.avatarUrl})); },
+  canSetAdmin:false
+};
+
+/* ---- 獨立網站：Firebase 會員系統（只在 SITE_CONFIG 存在時啟用） ---- */
+const FirebaseBackend={
+  label:"網站帳號",
+  unsubs:[], cache:{},
+  async init(){
+    const v=SITE.firebaseVersion||"10.12.2";
+    for(const m of ["app","auth","firestore"]) await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-${m}-compat.js`);
+    firebase.initializeApp(SITE.firebase);
+    this.auth=firebase.auth(); this.fs=firebase.firestore();
+    return new Promise(res=>{let first=true;this.auth.onAuthStateChanged(async u=>{await this.onUser(u);if(first){first=false;res(true)}})});
+  },
+  async onUser(u){
+    // 同一個帳號只處理一次（註冊時 Firebase 也會觸發登入事件，避免重複計算來訪與同時寫入）
+    const uid=u?u.uid:null; if(uid&&uid===this.lastUid) return; this.lastUid=uid;
+    if(adSubs){adSubs.forEach(f=>{try{f&&f()}catch(e){}});adSubs=null}
+    this.unsubs.forEach(f=>f()); this.unsubs=[];
+    if(!u){M.me=null;M.isAdmin=false;M.isOwner=false;M.tier="guest";M.member=null;sample=null;onMembership();return}
+    M.me={id:u.uid,name:u.displayName||(u.email||"").split("@")[0],avatar:u.photoURL||"",email:u.email||""};
+    const ownerMail=(SITE.ownerEmails||[]).map(x=>x.toLowerCase()).includes((u.email||"").toLowerCase());
+    M.isOwner=ownerMail&&u.emailVerified; M.needVerify=ownerMail&&!u.emailVerified;
+    const adm=await this.fs.doc(NS+"admins/"+u.uid).get().catch(()=>null);
+    M.isAdmin=M.isOwner||!!adm?.exists;
+    M.tier="free";
+    this.unsubs.push(this.fs.doc(NS+"config/features").onSnapshot(s=>{M.matrix=mergeMatrix(s.exists?s.data().matrix:null);onMembership()},()=>{}));
+    this.unsubs.push(this.fs.doc(NS+"tiers/"+u.uid).onSnapshot(s=>{const t=s.exists?s.data().tier:null;M.tier=TIER_KEYS.includes(t)?t:"free";onMembership()},()=>{}));
+    const m=await this.fs.doc(NS+"users/"+u.uid).get().catch(()=>null);
+    M.member=m?.exists?{...m.data()}:{joinedAt:Date.now(),usage:{}};
+    Object.assign(M.member,{name:M.me.name,email:M.me.email,visits:(M.member.visits||0)+1,lastSeen:Date.now()});
+    M.dirty=true; M.canWrite=null; flush();
+    sample=makeSiteAI(); onMembership();
+  },
+  saveMember(m){ return this.fs.doc(NS+"users/"+M.me.id).set(m,{merge:true}); },
+  watchMembers(cb){ return this.fs.collection(NS+"users").onSnapshot(s=>{const o={};s.forEach(d=>o[d.id]=d.data());this.cache=o;cb(o)},e=>cb(null,e)); },
+  watchTiers(cb){ return this.fs.collection(NS+"tiers").onSnapshot(s=>{const o={};s.forEach(d=>o[d.id]=d.data().tier);cb(o)},e=>cb(null,e)); },
+  watchAdmins(cb){ return this.fs.collection(NS+"admins").onSnapshot(s=>{const o={};s.forEach(d=>o[d.id]=true);cb(o)},()=>cb({})); },
+  setTier(id,t){ return this.fs.doc(NS+"tiers/"+id).set({tier:t,by:M.me.id,at:Date.now()}); },
+  setAdmin(id,on){ return on?this.fs.doc(NS+"admins/"+id).set({by:M.me.id,at:Date.now()}):this.fs.doc(NS+"admins/"+id).delete(); },
+  setMatrix(m){ return this.fs.doc(NS+"config/features").set({matrix:m,at:Date.now()}); },
+  async profiles(ids){ const o={}; ids.forEach(id=>{const u=this.cache[id]||{};o[id]={name:u.name||u.email||"",avatar:"",email:u.email||""}}); return o; },
+  async search(q){ q=q.trim().toLowerCase(); if(!q) return []; return Object.entries(this.cache).filter(([,u])=>(u.name||"").toLowerCase().includes(q)||(u.email||"").toLowerCase().includes(q)).slice(0,8).map(([id,u])=>({id,name:u.name||u.email,avatar:""})); },
+  canSetAdmin:true
+};
+function parseLooseJSON(t){
+  try{return JSON.parse(t)}catch(e){}
+  const m=t.match(/```(?:json)?\s*([\s\S]*?)```/); if(m){try{return JSON.parse(m[1])}catch(e){}}
+  const a=t.search(/[\[{]/), b=Math.max(t.lastIndexOf("}"),t.lastIndexOf("]"));
+  if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1))}catch(e){}}
+  return undefined;
+}
+async function blobToB64(b){
+  const bmp=await createImageBitmap(b); const sc=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+  const c=document.createElement("canvas"); c.width=Math.round(bmp.width*sc); c.height=Math.round(bmp.height*sc);
+  c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
+  return {media_type:"image/jpeg",data:c.toDataURL("image/jpeg",0.85).split(",")[1]};
+}
+function makeSiteAI(){
+  const call=async(input,opts={})=>{
+    const u=FirebaseBackend.auth.currentUser; if(!u) throw {code:"not_granted"};
+    const token=await u.getIdToken();
+    const images=[]; for(const b of [].concat(opts.images?[...opts.images]:[])) images.push(await blobToB64(b));
+    const prompt=typeof input==="string"?input:input.map(m=>m.content).join("\n\n");
+    let r; try{ r=await fetch(SITE.aiEndpoint||"/api/ai",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({prompt,images,kind:opts.kind||"ai_analyze",app:APP||""}),signal:opts.signal}) }
+    catch(e){ throw {code:e?.name==="AbortError"?"cancelled":"upstream_error"} }
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw {code:j.code||"upstream_error",message:j.message||""};
+    return j.text||"";
+  };
+  const f=async(input,opts)=>({text:await call(input,opts),truncated:false});
+  f.json=async(input,opts)=>{const t=await call(input,opts);const v=parseLooseJSON(t);if(v===undefined) throw {code:"invalid_json",text:t};return v};
+  f.limits=async()=>({maxPromptBytes:200000,images:{maxCount:4,maxInputBytes:20e6,mediaTypes:["image/jpeg","image/png","image/webp","image/gif"]}});
+  return f;
+}
+
+/* ---- 狀態改變時更新畫面 ---- */
+function onMembership(){
+  M.ready=true;
+  if(M.mode==="site"&&M.me) save(NS+"vs_lasttier",{tier:M.tier,matrix:M.matrix});
+  renderMemChip(); renderPersonas(); renderVoiceCards(); renderBookVoices(); updateLibCount();
+  if(typeof dbLoaded!=="undefined"&&dbLoaded) renderResults();
+  $("tabBtn-admin").hidden=!M.isAdmin;
+  if(SINGLE) document.querySelector(".tabs").hidden=!M.isAdmin;
+  if(!M.isAdmin&&st.tab==="admin") setTab("sec");
+  if(st.tab==="admin") renderAdmin();
+  const bl=$("bookLock"); bl.hidden=canUse("audiobook"); if(!bl.hidden) bl.textContent=lockMsg("audiobook");
+}
+function initials(name){ return (name||"?").trim().slice(0,1).toUpperCase(); }
+function avatarFallback(name,color){
+  const c=document.createElement("canvas"); c.width=c.height=56; const x=c.getContext("2d");
+  x.fillStyle=color||"#1F5F52"; x.beginPath(); x.arc(28,28,28,0,7); x.fill();
+  x.fillStyle="#fff"; x.font="bold 26px sans-serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(initials(name),28,30);
+  return c.toDataURL();
+}
+function renderMemChip(){
+  const c=$("memchip"), n=$("memNotice");
+  if(M.mode==="local"){c.hidden=true;n.hidden=true;return}
+  c.hidden=false;
+  const signedIn=!!M.me?.id;
+  $("memAvatar").src=M.me?.avatar||avatarFallback(M.me?.name||"訪");
+  $("memName").textContent=signedIn?(M.me.name||"你"):"訪客";
+  const tb=$("memTier"); tb.className="tierbadge"+(M.isAdmin?" admin":M.tier==="vip"?" vip":"");
+  tb.textContent=M.isOwner?"擁有者・全部功能":M.isAdmin?"管理員・全部功能":tierName(M.tier);
+  $("memLogin").hidden=!(M.mode==="site"&&!signedIn);
+  $("memLogout").hidden=!(M.mode==="site"&&signedIn);
+  $("memDelete").hidden=!(M.mode==="site"&&signedIn);
+  let msg="";
+  if(M.needVerify) msg="你是擁有者帳號，但 Email 還沒驗證。請到信箱點驗證連結，然後登出再登入，就會取得管理權限。";
+  if(M.mode==="claude"&&!signedIn) msg="目前沒有辨識到你的 Claude 帳號，先以訪客身分使用。登入 Claude 後重新開啟這個頁面，就會成為會員。";
+  else if(M.mode==="site"&&!signedIn) msg="登入或註冊後就能成為會員，使用更多功能。";
+  if(M.needVerify&&M.mode==="site") msg="你是擁有者帳號，但 Email 還沒驗證。請到信箱點驗證連結，然後登出再登入，就會取得管理權限。";
+  else if(M.canWrite===false&&!M.isAdmin) msg="你的使用紀錄目前無法儲存（只有檢視權限）。功能照常可以用；如果需要記錄，請管理員在分享選單把你設為「參與者」。";
+  n.hidden=!msg; n.textContent=msg;
+}
+$("memLogin").onclick=()=>openLogin();
+$("memLogout").onclick=async()=>{ await flush(); FirebaseBackend.auth?.signOut(); };
+$("memDelete").onclick=async()=>{
+  const b=$("memDelete"), n=$("memNotice");
+  if(b.dataset.armed!=="1"){
+    b.dataset.armed="1"; b.textContent="確定刪除";
+    n.hidden=false; n.textContent="刪除後，你的帳號和使用紀錄都會永久消失，無法復原"+(APP?"（同一個帳號在其他 App 的資料也會一起刪除）":"")+"。要刪除請再按一次「確定刪除」。";
+    setTimeout(()=>{b.dataset.armed="";b.textContent="刪除帳號"},8000); return;
+  }
+  const u=FirebaseBackend.auth?.currentUser; if(!u) return;
+  n.textContent="刪除中…";
+  try{
+    flushTimer&&clearTimeout(flushTimer); M.dirty=false; M.canWrite=false;
+    // 先刪帳號；三個 App 的會員資料、等級與使用次數由伺服器端 cleanupUser 函式在帳號刪除時一併清除。
+    // 若因登入太久被要求重新登入，資料完全不會動到。
+    await u.delete();
+    n.textContent="帳號已刪除。謝謝你使用。";
+  }catch(e){
+    n.textContent=e?.code==="auth/requires-recent-login"?"為了安全，請先登出再重新登入，然後馬上按「刪除帳號」。":"沒有刪除成功："+(e?.message||e?.code);
+  }
+  b.dataset.armed=""; b.textContent="刪除帳號";
+};
+
+/* ---- 登入視窗（只在獨立網站版使用） ---- */
+let lgMode="in";
+function openLogin(){ lgMode="in"; syncLogin(); $("loginModal").hidden=false; $("lgEmail").focus(); }
+function syncLogin(){
+  $("lgNameWrap").hidden=lgMode!=="up"; $("lgSubmit").textContent=lgMode==="up"?"註冊":"登入";
+  $("lgSwitch").textContent=lgMode==="up"?"已經有帳號？登入":"還沒有帳號？註冊";
+  $("lgPw").autocomplete=lgMode==="up"?"new-password":"current-password"; $("lgStatus").textContent="";
+  $("lgGoogle").hidden=IS_NATIVE;
+  $("loginTitle").textContent=(lgMode==="up"?"註冊":"登入")+(APP?APP_INFO[APP].title:"聲音秘書");
+}
+const LG_ERR={"auth/invalid-credential":"Email 或密碼不對。","auth/wrong-password":"Email 或密碼不對。","auth/user-not-found":"找不到這個帳號，要不要先註冊？","auth/email-already-in-use":"這個 Email 已經註冊過了，請直接登入。","auth/weak-password":"密碼至少要 6 個字。","auth/invalid-email":"Email 格式不對。","auth/popup-closed-by-user":"Google 登入視窗被關掉了。","auth/too-many-requests":"嘗試太多次，請稍後再試。"};
+$("lgSwitch").onclick=()=>{lgMode=lgMode==="up"?"in":"up";syncLogin()};
+$("lgClose").onclick=()=>{$("loginModal").hidden=true};
+$("loginForm").onsubmit=async e=>{
+  e.preventDefault(); const A=FirebaseBackend.auth; if(!A){$("lgStatus").textContent="會員系統載入失敗，請檢查網路後重新整理。";return}
+  const em=$("lgEmail").value.trim(), pw=$("lgPw").value; $("lgStatus").textContent="處理中…";
+  try{
+    if(lgMode==="up"){
+      const c=await A.createUserWithEmailAndPassword(em,pw);
+      await c.user.updateProfile({displayName:$("lgName").value.trim()||em.split("@")[0]});
+      await c.user.sendEmailVerification().catch(()=>{});
+      if(M.me&&M.me.id===c.user.uid){ M.me.name=c.user.displayName; if(M.member){M.member.name=M.me.name;M.dirty=true;flush()} renderMemChip(); }
+      else await FirebaseBackend.onUser(c.user);
+    }
+    else await A.signInWithEmailAndPassword(em,pw);
+    $("loginModal").hidden=true;
+  }catch(err){$("lgStatus").textContent=LG_ERR[err.code]||"登入失敗："+(err.message||err.code)}
+};
+$("lgGoogle").onclick=async()=>{ try{await FirebaseBackend.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());$("loginModal").hidden=true}catch(err){$("lgStatus").textContent=LG_ERR[err.code]||"Google 登入失敗。"} };
+$("lgForgot").onclick=async()=>{ const em=$("lgEmail").value.trim(); if(!em){$("lgStatus").textContent="請先輸入 Email。";return} try{await FirebaseBackend.auth.sendPasswordResetEmail(em);$("lgStatus").textContent="重設密碼的信已寄出，請到信箱查看。"}catch(err){$("lgStatus").textContent=LG_ERR[err.code]||"寄送失敗。"} };
+
+/* ---- 後台 ---- */
+let adSubs=null, adProfiles={};
+function renderAdmin(){
+  if(!M.isAdmin||!B) return;
+  if(!adSubs){
+    $("adSync").textContent="正在讀取會員資料…";
+    adSubs=[
+      B.watchMembers((o,e)=>{ if(o){M.members=o;$("adSync").textContent="資料即時同步中"} else $("adSync").textContent="讀不到會員資料，請確認你是編輯者或擁有者。"; drawAdmin(); }),
+      B.watchTiers(o=>{ if(o){M.tiers=o;drawAdmin()} }),
+      B.watchAdmins(o=>{ M.admins=o||{}; drawAdmin(); })
+    ];
+    const tf=$("adTierFilter"), nt=$("adNewTier");
+    tf.innerHTML='<option value="">全部等級</option>'+TIERS.filter(t=>t[0]!=="guest").map(t=>`<option value="${t[0]}">${t[1]}</option>`).join("");
+    nt.innerHTML=TIERS.filter(t=>t[0]!=="guest").map(t=>`<option value="${t[0]}">${t[1]}</option>`).join("");
+    drawDeploy();
+  }
+  drawMatrix(); drawAdmin();
+}
+const fmtDate=t=>t?new Date(t).toLocaleDateString("zh-TW",{year:"numeric",month:"numeric",day:"numeric"}):"—";
+function ago(t){
+  if(!t) return "—"; const d=(Date.now()-t)/60000;
+  if(d<2) return "剛剛"; if(d<60) return `${Math.round(d)} 分鐘前`; if(d<1440) return `${Math.round(d/60)} 小時前`; if(d<43200) return `${Math.round(d/1440)} 天前`; return fmtDate(t);
+}
+let drawPending=false;
+async function drawAdmin(){
+  if(drawPending) return; drawPending=true; await Promise.resolve(); drawPending=false;
+  const ids=[...new Set([...Object.keys(M.members),...Object.keys(M.tiers)])];
+  try{ adProfiles=await B.profiles(ids) }catch(e){}
+  const tierOf=id=>TIER_KEYS.includes(M.tiers[id])?M.tiers[id]:"free";
+  const now=Date.now(), day=86400000;
+  const active1=ids.filter(id=>(M.members[id]?.lastSeen||0)>now-day).length;
+  const active7=ids.filter(id=>(M.members[id]?.lastSeen||0)>now-7*day).length;
+  const tc={}; ids.forEach(id=>{const t=tierOf(id);tc[t]=(tc[t]||0)+1});
+  const uc={}; ids.forEach(id=>{const u=M.members[id]?.usage||{};appUsage().forEach(([k])=>uc[k]=(uc[k]||0)+(u[k]||0))});
+  $("kpis").innerHTML="";
+  [["會員總數",ids.length],["今天有使用",active1],["7 天內有使用",active7],["VIP 會員",tc.vip||0]].forEach(([l,v])=>{
+    const d=document.createElement("div");d.className="kpi";d.innerHTML="<b></b><span></span>";d.querySelector("b").textContent=v;d.querySelector("span").textContent=l;$("kpis").append(d);
+  });
+  drawBars("tierBars",TIERS.filter(t=>t[0]!=="guest").map(([k,n])=>[n,tc[k]||0]));
+  drawBars("useBars",appUsage().map(([k,n])=>[n,uc[k]||0]));
+  // table
+  const q=$("adFilter").value.trim().toLowerCase(), tf=$("adTierFilter").value;
+  const rows=ids.filter(id=>{const p=adProfiles[id]||{};return (!q||(p.name||"").toLowerCase().includes(q)||(p.email||"").toLowerCase().includes(q))&&(!tf||tierOf(id)===tf)})
+    .sort((a,b)=>(M.members[b]?.lastSeen||0)-(M.members[a]?.lastSeen||0));
+  const tb=$("memTable"); tb.innerHTML="";
+  const head=document.createElement("tr");
+  ["會員","等級","加入","最後使用","使用狀況"].concat(B.canSetAdmin?["管理員"]:[]).forEach(h=>{const th=document.createElement("th");th.textContent=h;head.append(th)});
+  tb.append(head);
+  if(!rows.length){const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=6;td.className="empty";td.textContent=ids.length?"沒有符合篩選的會員。":"還沒有會員。分享這個頁面給別人，他們打開後就會出現在這裡。";tr.append(td);tb.append(tr)}
+  rows.forEach(id=>{
+    const p=adProfiles[id]||{}, m=M.members[id]||{}, tr=document.createElement("tr");
+    const who=document.createElement("td"); const wi=document.createElement("div"); wi.className="who"; who.append(wi);
+    const img=document.createElement("img"); img.alt=""; img.src=p.avatar||avatarFallback(p.name); wi.append(img);
+    const nm=document.createElement("span"); nm.textContent=(p.name||"（名字不公開）")+(id===M.me?.id?"（你）":"")+(p.guest?"・外部":""); wi.append(nm);
+    tr.append(who);
+    const tdT=document.createElement("td"); const sel=document.createElement("select"); sel.setAttribute("aria-label","會員等級");
+    TIERS.filter(t=>t[0]!=="guest").forEach(([k,n])=>{const o=document.createElement("option");o.value=k;o.textContent=n;sel.append(o)});
+    sel.value=tierOf(id);
+    if(id===M.me?.id&&!M.isOwner){sel.disabled=true;sel.title="不能修改自己的等級"}
+    sel.onchange=async()=>{ const v=sel.value; $("adStatus").textContent="儲存中…"; try{await B.setTier(id,v);$("adStatus").textContent=`已把 ${p.name||"這位會員"} 設為${tierName(v)}。`}catch(e){$("adStatus").textContent="沒有儲存成功："+(e?.message||e?.code||"請確認你有管理權限");sel.value=tierOf(id)} };
+    tdT.append(sel); tr.append(tdT);
+    const tdJ=document.createElement("td"); tdJ.textContent=fmtDate(m.joinedAt); tr.append(tdJ);
+    const tdL=document.createElement("td"); tdL.textContent=m.lastSeen?ago(m.lastSeen):"還沒開過"; tr.append(tdL);
+    const tdU=document.createElement("td"); tdU.className="use";
+    const u=m.usage||{}; tdU.textContent=m.joinedAt?`來訪 ${m.visits||0} 次・`+appUsage().map(([k,n])=>`${n} ${u[k]||0}`).join("・"):"由管理員加入，尚無紀錄";
+    tr.append(tdU);
+    if(B.canSetAdmin){
+      const tdA=document.createElement("td"); const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!M.admins[id]; cb.setAttribute("aria-label","設為管理員");
+      if(id===M.me?.id){cb.disabled=true;cb.checked=true}
+      cb.onchange=async()=>{try{await B.setAdmin(id,cb.checked);$("adStatus").textContent=cb.checked?"已設為管理員。":"已取消管理員。"}catch(e){cb.checked=!cb.checked;$("adStatus").textContent="沒有儲存成功，只有擁有者能指定管理員。"}};
+      tdA.append(cb); tr.append(tdA);
+    }
+    tb.append(tr);
+  });
+}
+function drawBars(id,data){
+  const box=$(id); box.innerHTML=""; const max=Math.max(1,...data.map(d=>d[1]));
+  data.forEach(([l,v])=>{
+    const r=document.createElement("div"); r.className="bar";
+    r.innerHTML='<span></span><span class="track"><i></i></span><em></em>';
+    r.querySelector("span").textContent=l; r.querySelector("i").style.width=(v/max*100)+"%"; r.querySelector("em").textContent=v;
+    box.append(r);
+  });
+}
+$("adFilter").addEventListener("input",()=>drawAdmin());
+$("adTierFilter").onchange=()=>drawAdmin();
+let adSearchT=null;
+$("adSearch").addEventListener("input",()=>{ clearTimeout(adSearchT); adSearchT=setTimeout(doSearch,250); });
+$("adSearch").addEventListener("focus",doSearch);
+async function doSearch(){
+  if(!B) return; const q=$("adSearch").value.trim(); const ul=$("adHits"); ul.innerHTML="";
+  let hits=[]; try{hits=await B.search(q)}catch(e){}
+  $("adSearchNote").textContent=M.mode==="claude"?"可以搜尋到你組織裡的同事。組織外的人請先從分享選單用 Email 邀請，他們打開頁面後會自動出現在會員列表。":(hits.length||!q?"":"找不到。對方要先在網站上註冊一次，才會出現在這裡。");
+  hits.forEach(h=>{
+    const li=document.createElement("li"); const img=document.createElement("img"); img.alt=""; img.src=h.avatar||avatarFallback(h.name);
+    const sp=document.createElement("span"); sp.textContent=h.name;
+    const b=document.createElement("button"); b.type="button"; b.textContent=(M.tiers[h.id]||M.members[h.id])?"已是會員":"加為會員"; b.disabled=!!M.tiers[h.id];
+    b.onclick=async()=>{ try{await B.setTier(h.id,$("adNewTier").value);b.textContent="已加入";b.disabled=true;$("adStatus").textContent=`已把 ${h.name} 加為${tierName($("adNewTier").value)}。`}catch(e){$("adStatus").textContent="沒有加入成功，請確認你有管理權限。"} };
+    li.append(img,sp,b); ul.append(li);
+  });
+}
+let mxDraft=null;
+function drawMatrix(){
+  mxDraft=JSON.parse(JSON.stringify(M.matrix));
+  const t=$("matrix"); t.innerHTML="";
+  const h=document.createElement("tr"); h.innerHTML="<th>功能</th>"; TIERS.forEach(([,n])=>{const th=document.createElement("th");th.textContent=n;h.append(th)});
+  const th=document.createElement("th"); th.textContent="管理員"; h.append(th); t.append(h);
+  appFeatures().forEach(([k,n,d])=>{
+    const tr=document.createElement("tr"); const td=document.createElement("td"); td.textContent=n;
+    if(d){const sm=document.createElement("small");sm.textContent=d;td.append(sm)} tr.append(td);
+    TIER_KEYS.forEach(tk=>{const c=document.createElement("td");const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!mxDraft[tk][k];cb.setAttribute("aria-label",`${tierName(tk)}可以使用${n}`);cb.onchange=()=>{mxDraft[tk][k]=cb.checked;$("mxStatus").textContent="有變更還沒儲存。"};c.append(cb);tr.append(c)});
+    const c=document.createElement("td"); const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.disabled=true; cb.setAttribute("aria-label","管理員一律可用"); c.append(cb); tr.append(c);
+    t.append(tr);
+  });
+}
+$("mxSave").onclick=async()=>{ $("mxStatus").textContent="儲存中…"; try{await B.setMatrix(mxDraft);$("mxStatus").textContent="已儲存，所有會員的畫面會立刻更新。"}catch(e){$("mxStatus").textContent="沒有儲存成功，請確認你有管理權限。"} };
+$("mxReset").onclick=()=>{ M.matrix=mergeMatrix(null); drawMatrix(); $("mxStatus").textContent="已恢復預設，按「儲存設定」才會生效。"; };
+function drawDeploy(){
+  const box=$("deployInfo");
+  if(M.mode==="site"){
+    box.innerHTML=(APP?`<p>這是「${APP_INFO[APP].title}」App。會員名單、等級和管理員只屬於這個 App，和其他 App 分開管理。</p>`:`<p>這是獨立網站版，網址就是你在 Firebase Hosting 綁定的網域。</p>`)+`
+<table><tr><th>身分</th><th>可以做的事</th></tr>
+<tr><td>擁有者</td><td>設定檔 <code>config.js</code> 裡 <code>ownerEmails</code> 列出的帳號（Email 要先驗證），可以指定其他管理員。</td></tr>
+<tr><td>管理員</td><td>在會員列表勾選「管理員」的人，可以調整會員等級和功能開放。</td></tr>
+<tr><td>會員</td><td>註冊後自動成為免費會員，由管理員升級。</td></tr></table>
+<p>權限由伺服器端的 Firestore 規則把關，會員無法自己改等級。AI 功能經過你的 Cloud Function 呼叫，費用算在你的 Anthropic API 帳號。</p>`;
+    return;
+  }
+  box.innerHTML=`<p><b>固定網址：</b>這個頁面的網址不會變，之後更新功能也還是同一個連結。</p>
+<p><b>誰能進來、誰能管理</b>，由頁面右上角的「分享」選單決定，頁面裡的會員等級則決定能用哪些功能：</p>
+<table><tr><th>分享選單的身分</th><th>在這個頁面</th></tr>
+<tr><td>擁有者（你）</td><td>全部功能、後台管理、可以改任何人的等級</td></tr>
+<tr><td>編輯者</td><td>共同管理員：可以使用後台、調整會員等級與功能開放（不能改自己的等級）</td></tr>
+<tr><td>參與者</td><td>一般會員：依等級使用功能，使用狀況會記錄到後台</td></tr>
+<tr><td>檢視者／留言者</td><td>依等級使用功能，但平台不允許寫入，所以後台看不到他們的使用狀況</td></tr></table>
+<p><b>要注意：</b>會員等級是功能分級，不是嚴格的安全防護，懂技術的人仍可能繞過。需要真正擋住的權限，請用獨立網站版。</p>
+<p><b>自訂網域：</b>這個頁面只能用 claude.ai 的網址。要用你自己的網域（例如 <code>secretary.你的網域.com</code>），請部署我另外提供的獨立網站版（Firebase），裡面有一步一步的說明。</p>`;
+}
+
+/* ---- 功能把關：匯入檔案、有聲書 ---- */
+const _addFilesGate=addFiles;
+addFiles=async function(list){ if(!gate("file_import",$("status"))) return; const ok0=docs.filter(d=>d.status==="ok").length; await _addFilesGate(list); track("imports",Math.max(0,docs.filter(d=>d.status==="ok").length-ok0)); };
+const _importBookGate=importBook;
+importBook=async function(f){ if(!gate("audiobook",$("bookStatus"))) return; track("imports"); return _importBookGate(f); };
+const _playBookGate=playBook;
+playBook=async function(){ if(!gate("audiobook",$("bookStatus"))) return; return _playBookGate(); };
+
+/* ---- 單一 App 模式的畫面 ---- */
+if(APP){
+  const info=APP_INFO[APP];
+  document.title=info.title;
+  document.querySelector("h1").textContent=info.title;
+  $("sub").textContent=info.sub;
+  if(info.tab){
+    ["sec","story","book"].forEach(k=>{ if(k!==info.tab) $("tabBtn-"+k).hidden=true; });
+    const _setTab=setTab;
+    setTab=function(t){ _setTab(t==="admin"?"admin":info.tab); $("sub").textContent=t==="admin"?"管理會員等級、功能開放和使用狀況。":info.sub; };
+    document.querySelector(".tabs").hidden=true;
+  }
+}
+
+/* ---- 啟動 ---- */
+(async()=>{
+  try{
+    if(FB_READY){ M.mode="site"; B=FirebaseBackend; renderMemChip(); await B.init(); }
+    else if(SITE&&SITE.firebase){ $("memNotice").hidden=false; $("memNotice").textContent="測試模式：還沒設定會員系統，所有功能先開放試用。AI 功能要設定好 Firebase 後才能用。"; }
+    else if(window.claude?.use){
+      M.mode="claude"; B=ClaudeBackend;
+      if(!(await ClaudeBackend.init())){ B=null; M.tier="guest"; }
+    }
+  }catch(e){
+    console.warn("membership init failed",e);
+    if(M.mode==="claude"){B=null;M.tier="guest"}
+    else if(M.mode!=="site"){M.mode="local";B=null}
+    else{
+      // 離線或 Firebase 載入失敗：沿用這台裝置上次登入時的等級（只影響本機功能；AI 仍需連線）
+      const c=load(NS+"vs_lasttier",null);
+      if(c&&c.tier){M.tier=c.tier;M.matrix=mergeMatrix(c.matrix)}
+      $("memNotice").hidden=false;
+      $("memNotice").textContent="會員系統載入失敗（可能沒有網路），"+(c&&c.tier?"暫時沿用這台裝置上次登入的等級。":"目前以訪客身分使用。")+"連上網路後重新整理即可。";
+    }
+  }
+  onMembership();
+})();
+
+renderPersonas(); renderVoiceCards(); renderStory(); updateStoryBtns();
+setTab(SINGLE?APP_INFO[APP].tab:(["#story","#book"].includes(location.hash)?location.hash.slice(1):(["sec","story","book"].includes(st.tab)?st.tab:"sec")));
+if(!SINGLE||APP==="stories") loadDB();
+render();
+</script>
+
+</body></html>

@@ -1,0 +1,8 @@
+{
+  "appId": "com.example.voicesecretary",
+  "appName": "聲音秘書",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}

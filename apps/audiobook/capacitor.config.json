@@ -1,0 +1,8 @@
+{
+  "appId": "com.example.storytelleraudiobook",
+  "appName": "說書人有聲書",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -1,0 +1,76 @@
+# 自動編譯四個 Android App 的測試版 APK
+# 推上 main 分支或在 Actions 頁面按「Run workflow」就會執行；完成後到 Releases 的「測試版」下載 APK。
+name: 編譯測試版 APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: secretary
+            color: "#1F5F52"
+          - app: stories
+            color: "#24305E"
+          - app: audiobook
+            color: "#7A4A1E"
+          - app: all
+            color: "#3A2E5C"
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: 安裝套件
+        run: npm install --no-audit --no-fund
+      - name: 加入 Android 平台
+        run: npx cap add android
+      - name: 產生圖示與啟動畫面
+        run: npx capacitor-assets generate --android --iconBackgroundColor "${{ matrix.color }}" --splashBackgroundColor "${{ matrix.color }}" --splashBackgroundColorDark "${{ matrix.color }}"
+      - name: 同步網頁內容
+        run: npx cap sync android
+      - name: 編譯 APK
+        working-directory: apps/${{ matrix.app }}/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          mkdir -p ../../../out
+          cp app/build/outputs/apk/debug/app-debug.apk ../../../out/voice-secretary-${{ matrix.app }}-test.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ matrix.app }}
+          path: out/*.apk
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: 更新「測試版」Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete test-latest --yes --cleanup-tag || true
+          gh release create test-latest out/*.apk --prerelease --title "測試版 APK（${{ github.sha }}）" \
+            --notes "四個 App 的測試版，可以直接安裝到手機。還沒設定 Firebase 時是「測試模式」：不用登入、全部功能開放，AI 功能要等 Firebase 設定好才能用。"
